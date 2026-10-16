@@ -17,6 +17,9 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {
+    root: process.cwd(),
+  },
   poweredByHeader: false,
   deploymentId: process.env.DEPLOYMENT_VERSION,
   async headers() {
