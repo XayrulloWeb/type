@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(uuid())
+  firstName          String
+  lastName           String
+  username           String    @unique
+  passwordHash       String
+  passwordEncrypted  String?   @db.Text
+  role               String // "STUDENT", "SUPER_ADMIN"
+  classId            String?
+  class              Class?    @relation(fields: [classId], references: [id])
+  isActive           Boolean   @default(true)
+  archivedAt         DateTime?
+  mustChangePassword Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  testResults       TestResult[]
+  assignmentResults AssignmentResult[]
+  olympiadEntries   OlympiadParticipant[]
+  assignedClasses   Class[]               @relation("TeacherClasses")
+
+  @@index([role, isActive])
+  @@index([classId])
+}
+
+model Class {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "6A"
+  grade     Int // e.g. 6
+  section   String // e.g. "A"
+  createdAt DateTime @default(now())
+
+  students    User[]
+  teachers    User[]          @relation("TeacherClasses")
+  assignments Assignment[]
+  olympiads   OlympiadClass[]
+}
+
+model TestResult {
+  id              String   @id @default(uuid())
+  clientAttemptId String?  @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  mode            String // "time" or "words"
+  language        String // "ru", "uz", "en"
+  duration        Int // in seconds
+  wordsCount      Int?
+  wpm             Int
+  rawWpm          Int
+  accuracy        Float
+  correctChars    Int
+  incorrectChars  Int
+  extraChars      Int
+  missedChars     Int
+  focusLostCount  Int      @default(0)
+  isRanked        Boolean  @default(true)
+  reviewStatus    String? // "pending", "approved", "rejected"
+  createdAt       DateTime @default(now())
+
+  assignmentResults AssignmentResult[]
+
+  @@index([userId, isRanked, wpm])
+  @@index([isRanked, createdAt])
+  @@index([reviewStatus])
+}
+
+model Text {
+  id         String   @id @default(uuid())
+  title      String
+  content    String
+  language   String
+  grade      Int? // For filtering texts by grade
+  difficulty String // "easy", "medium", "hard"
+  createdBy  String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  assignments Assignment[]
+}
+
+model Assignment {
+  id              String    @id @default(uuid())
+  title           String
+  textId          String
+  text            Text      @relation(fields: [textId], references: [id])
+  classId         String
+  class           Class     @relation(fields: [classId], references: [id])
+  teacherId       String
+  minimumWpm      Int?
+  minimumAccuracy Float?
+  deadline        DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+
+  results AssignmentResult[]
+}
+
+model AssignmentResult {
+  id           String      @id @default(uuid())
+  assignmentId String
+  assignment   Assignment  @relation(fields: [assignmentId], references: [id])
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  testResultId String?
+  testResult   TestResult? @relation(fields: [testResultId], references: [id])
+  status       String // "not_completed", "completed"
+  completedAt  DateTime?
+
+  @@unique([assignmentId, userId])
+  @@index([userId, status])
+}
+
+model AdminActivity {
+  id            String   @id @default(uuid())
+  actorId       String
+  actorUsername String
+  action        String
+  entityType    String
+  entityId      String?
+  description   String
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+model Olympiad {
+  id              String    @id @default(uuid())
+  title           String
+  description     String?
+  text            String    @db.Text
+  textSecond      String?   @db.Text
+  language        String
+  durationSeconds Int
+  attemptLimit    Int       @default(2)
+  breakSeconds    Int       @default(10)
+  status          String    @default("WAITING") // WAITING, RUNNING, FINISHED, CANCELLED
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+
+  targetClasses OlympiadClass[]
+  participants  OlympiadParticipant[]
+
+  @@index([status, createdAt])
+}
+
+model OlympiadClass {
+  olympiadId String
+  olympiad   Olympiad @relation(fields: [olympiadId], references: [id], onDelete: Cascade)
+  classId    String
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@id([olympiadId, classId])
+  @@index([classId])
+}
+
+model OlympiadParticipant {
+  id                     String            @id @default(uuid())
+  olympiadId             String
+  olympiad               Olympiad          @relation(fields: [olympiadId], references: [id], onDelete: Cascade)
+  userId                 String
+  user                   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt               DateTime          @default(now())
+  submittedAt            DateTime?
+  duration               Int?
+  wpm                    Int?
+  rawWpm                 Int?
+  accuracy               Float?
+  correctChars           Int?
+  incorrectChars         Int?
+  extraChars             Int?
+  missedChars            Int?
+  focusLostCount         Int               @default(0)
+  pasteDetected          Boolean           @default(false)
+  needsReview            Boolean           @default(false)
+  disqualifiedAt         DateTime?
+  disqualifiedBy         String?
+  disqualificationReason String?
+  attempts               OlympiadAttempt[]
+
+  @@unique([olympiadId, userId])
+  @@index([olympiadId, submittedAt])
+  @@index([userId])
+}
+
+model OlympiadAttempt {
+  id             String              @id @default(uuid())
+  participantId  String
+  participant    OlympiadParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  attemptNumber  Int
+  submittedAt    DateTime            @default(now())
+  duration       Int
+  wpm            Int
+  rawWpm         Int
+  accuracy       Float
+  correctChars   Int
+  incorrectChars Int
+  extraChars     Int
+  missedChars    Int
+  focusLostCount Int                 @default(0)
+  pasteDetected  Boolean             @default(false)
+  needsReview    Boolean             @default(false)
+
+  @@unique([participantId, attemptNumber])
+  @@index([participantId])
+}
+
+model DailyChallenge {
+  id           String   @id @default(uuid())
+  textId       String
+  date         DateTime @unique // The day of the challenge
+  attemptLimit Int      @default(3)
+}
