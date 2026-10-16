@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import { BookOpen, BookOpenText, ClipboardList, Gauge, ScrollText, ShieldCheck, Trophy, Users } from "lucide-react";
+import { BarChart3, BookOpen, BookOpenText, ClipboardList, Gauge, ScrollText, ShieldCheck, Trophy, Users } from "lucide-react";
 
-const icons = { gauge: Gauge, users: Users, classes: BookOpen, texts: BookOpenText, assignments: ClipboardList, olympiads: Trophy, review: ShieldCheck, activity: ScrollText } as const;
+const icons = { gauge: Gauge, ranking: BarChart3, users: Users, classes: BookOpen, texts: BookOpenText, assignments: ClipboardList, olympiads: Trophy, review: ShieldCheck, activity: ScrollText } as const;
 
 export interface AdminNavItem {
   href: string;

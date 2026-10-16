@@ -14,6 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { t } = await getI18n();
   const nav = [
     { href: "/admin", label: t("admin.overview"), icon: "gauge" as const },
+    { href: "/admin/ranking", label: "Рейтинг", icon: "ranking" as const },
     { href: "/admin/students", label: t("admin.students"), icon: "users" as const },
     { href: "/admin/classes", label: t("admin.classes"), icon: "classes" as const },
     { href: "/admin/texts", label: t("admin.texts"), icon: "texts" as const },
