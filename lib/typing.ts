@@ -63,14 +63,17 @@ export function getLevel(wpm: number) {
 
 export function getRankingState(input: {
   stats: TypingStats;
+  mode: "time" | "words" | "text";
   selectedDuration?: number;
   pasteDetected?: boolean;
 }) {
   const reasons: string[] = [];
-  const minimumRankedDuration = input.selectedDuration === 15 ? 14 : 29;
-  if (input.stats.timeElapsed < minimumRankedDuration) reasons.push("duration_too_short");
-  if (input.selectedDuration && input.selectedDuration >= 30 && input.stats.timeElapsed < input.selectedDuration - 1) {
-    reasons.push("incomplete_timer");
+  if (input.mode === "time") {
+    const minimumRankedDuration = input.selectedDuration === 15 ? 14 : 29;
+    if (input.stats.timeElapsed < minimumRankedDuration) reasons.push("duration_too_short");
+    if (input.selectedDuration && input.selectedDuration >= 30 && input.stats.timeElapsed < input.selectedDuration - 1) {
+      reasons.push("incomplete_timer");
+    }
   }
   if (input.stats.wpm > 220 || input.stats.rawWpm > 260) reasons.push("unrealistic_speed");
   if (input.stats.focusLostCount > 3) reasons.push("focus_lost");

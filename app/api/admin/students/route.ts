@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const lastName = clean(row.lastName);
     const className = clean(row.className).toUpperCase();
     const schoolClass = classByName.get(className);
-    if (!firstName || !lastName || !schoolClass) {
+    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !schoolClass) {
       errors.push({ row: index + 1, message: !schoolClass ? `Class ${className || "is missing"} does not exist.` : "First and last name are required." });
       continue;
     }

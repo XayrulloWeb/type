@@ -2,9 +2,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb } from "pdf-lib";
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { authOptions } from "@/lib/auth";
+import { requireSuperAdmin } from "@/lib/admin";
 import { getOlympiadExportData, rankedParticipants } from "@/lib/olympiad-data";
 
 function fit(font: { widthOfTextAtSize(text: string, size: number): number }, text: string, maxWidth: number, initial: number) {
@@ -14,8 +13,8 @@ function fit(font: { widthOfTextAtSize(text: string, size: number): number }, te
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await requireSuperAdmin();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const olympiad = await getOlympiadExportData(id);
   if (!olympiad) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import { StudentManager } from "@/components/admin/StudentManager";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 export default async function StudentsPage() {
+  await requireSuperAdminPage();
   const [classes, students] = await Promise.all([
     prisma.class.findMany({ orderBy: [{ grade: "asc" }, { section: "asc" }] }),
     prisma.user.findMany({

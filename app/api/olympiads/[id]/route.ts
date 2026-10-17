@@ -106,6 +106,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
+  const account = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, isActive: true, archivedAt: true, classId: true, class: { select: { grade: true } } },
+  });
+  if (!account?.isActive || account.archivedAt || !["STUDENT", "SUPER_ADMIN"].includes(account.role)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
   let olympiad = await getOlympiad(id);
   if (!olympiad) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -114,12 +121,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!olympiad) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const classIds = olympiad.targetClasses.map((item) => item.classId);
-  const eligibleCount = await prisma.user.count({ where: { role: "STUDENT", isActive: true, classId: { in: classIds } } });
-  const isAdmin = session.user.role === "SUPER_ADMIN";
+  const eligibleCount = await prisma.user.count({ where: { role: "STUDENT", isActive: true, archivedAt: null, classId: { in: classIds } } });
+  const isAdmin = account.role === "SUPER_ADMIN";
   const ownEntry = olympiad.participants.find((item) => item.userId === session.user.id);
   if (!isAdmin) {
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { classId: true, isActive: true, class: { select: { grade: true } } } });
-    if (!user?.isActive || !user.classId || !classIds.includes(user.classId) || !user.class || ![5, 6, 7].includes(user.class.grade)) {
+    if (account.role !== "STUDENT" || !account.classId || !classIds.includes(account.classId) || !account.class || ![5, 6, 7].includes(account.class.grade)) {
       return NextResponse.json({ error: "Not eligible" }, { status: 403 });
     }
   }
@@ -178,8 +184,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!olympiad) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const classIds = olympiad.targetClasses.map((item) => item.classId);
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { classId: true, isActive: true, class: { select: { grade: true } } } });
-  if (!user?.isActive || !user.classId || !classIds.includes(user.classId) || !user.class || ![5, 6, 7].includes(user.class.grade)) {
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, classId: true, isActive: true, archivedAt: true, class: { select: { grade: true } } } });
+  if (!user?.isActive || user.archivedAt || user.role !== "STUDENT" || !user.classId || !classIds.includes(user.classId) || !user.class || ![5, 6, 7].includes(user.class.grade)) {
     return NextResponse.json({ error: "Not eligible" }, { status: 403 });
   }
 
@@ -191,7 +197,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       update: {},
     });
     const [eligibleCount, joinedCount] = await Promise.all([
-      prisma.user.count({ where: { role: "STUDENT", isActive: true, classId: { in: classIds } } }),
+      prisma.user.count({ where: { role: "STUDENT", isActive: true, archivedAt: null, classId: { in: classIds } } }),
       prisma.olympiadParticipant.count({ where: { olympiadId: id } }),
     ]);
     if (!olympiad.scheduledAt && eligibleCount > 0 && joinedCount >= eligibleCount) {
@@ -216,7 +222,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const officialEnd = attemptNumber === 1 ? times.firstEnd : times.secondEnd;
     const now = new Date();
     if (now.getTime() < officialStart - 500) return NextResponse.json({ error: "Too early" }, { status: 409 });
-    if (now.getTime() > officialEnd + 30_000) return NextResponse.json({ error: "Submission window closed" }, { status: 409 });
+    if (now.getTime() > officialEnd + 5_000) return NextResponse.json({ error: "Submission window closed" }, { status: 409 });
 
     const expectedText = attemptNumber === 1 ? olympiad.text : olympiad.textSecond ?? olympiad.text;
     const typedText = typeof body?.typedText === "string" ? body.typedText : "";

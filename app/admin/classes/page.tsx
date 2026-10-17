@@ -2,12 +2,14 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { createClass } from "./actions";
 import { getI18n } from "@/lib/i18n";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 export default async function ClassesPage() {
+  await requireSuperAdminPage();
   const [classes, { locale }] = await Promise.all([prisma.class.findMany({
     orderBy: [{ grade: 'asc' }, { section: 'asc' }],
     include: {
-      students: { where: { role: "STUDENT", isActive: true }, include: { testResults: { where: { isRanked: true, language: { in: ["ru", "en"] } } } } },
+      students: { where: { role: "STUDENT", isActive: true, archivedAt: null }, include: { testResults: { where: { isRanked: true, language: { in: ["ru", "en"] } } } } },
     },
   }), getI18n()]);
   const ui = locale === "uz" ? { eyebrow: "Maktab tuzilmasi", title: "Sinflar", subtitle: "Dastur kodini o‘zgartirmasdan sinflar yarating.", add: "Sinf qo‘shish", name: "Sinf nomi (masalan, 6A)", grade: "Sinf raqami", section: "Harf", create: "Yaratish", students: "O‘quvchilar", average: "O‘rtacha WPM", details: "Batafsil", open: "Statistikani ochish", empty: "Hali sinflar yaratilmagan." } : { eyebrow: "Структура школы", title: "Классы", subtitle: "Создавайте классы без изменения кода приложения.", add: "Добавить класс", name: "Название класса (например, 6A)", grade: "Номер класса", section: "Буква", create: "Создать", students: "Ученики", average: "Средняя скорость", details: "Подробнее", open: "Открыть статистику", empty: "Классы пока не созданы." };

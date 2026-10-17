@@ -8,8 +8,8 @@ import clsx from "clsx";
 import { Header } from "@/components/Header";
 import { TypingArea } from "@/components/typing/TypingArea";
 import { useTypingEngine, type TypingMode } from "@/hooks/useTypingEngine";
-import { getPreparedText, getRandomWords } from "@/lib/words";
 import type { TypingStats } from "@/lib/typing";
+import type { TestChallenge } from "@/lib/test-challenge";
 import { useI18n } from "@/components/LocaleProvider";
 
 type Language = "en" | "ru";
@@ -25,11 +25,6 @@ interface SavedResult {
   assignmentCompleted?: boolean;
 }
 
-function makeText(mode: TypingMode, language: Language, wordCount: number, exclude?: string) {
-  if (mode === "text") return getPreparedText(language, exclude);
-  return getRandomWords(language, mode === "time" ? 260 : wordCount, exclude);
-}
-
 interface AssignmentPractice {
   id: string;
   title: string;
@@ -38,50 +33,74 @@ interface AssignmentPractice {
 }
 
 interface LibraryPractice {
+  id: string;
   title: string;
   text: string;
   language: Language;
 }
 
-export function TypingPractice({ user, assignment, libraryText, initialText }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialText?: string }) {
+export function TypingPractice({ user, assignment, libraryText, initialChallenge, practiceOnly = false }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; practiceOnly?: boolean }) {
   const fixedText = assignment ?? libraryText;
   const { t } = useI18n();
-  const [mode, setMode] = useState<TypingMode>(fixedText ? "text" : "time");
-  const [duration, setDuration] = useState(60);
-  const [wordCount, setWordCount] = useState(25);
-  const [language, setLanguage] = useState<Language>(fixedText?.language ?? "en");
-  const [expectedText, setExpectedText] = useState(() => fixedText?.text ?? initialText ?? "the be of and a to in he have it that for they with as not on she at by this we you do but from or which one");
+  const [mode, setMode] = useState<TypingMode>(initialChallenge.mode);
+  const [duration, setDuration] = useState(initialChallenge.selectedDuration ?? 60);
+  const [wordCount, setWordCount] = useState(initialChallenge.wordsCount ?? 25);
+  const [language, setLanguage] = useState<Language>(initialChallenge.language);
+  const [challenge, setChallenge] = useState(initialChallenge);
   const [sessionKey, setSessionKey] = useState(0);
   const [focusMode, setFocusMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [challengeLoading, setChallengeLoading] = useState(false);
+  const [challengeError, setChallengeError] = useState(false);
+
+  const loadChallenge = useCallback(async (nextMode: TypingMode, nextLanguage: Language, nextDuration: number, nextWordCount: number) => {
+    if (challengeLoading) return;
+    setChallengeLoading(true);
+    setChallengeError(false);
+    try {
+      const response = await fetch("/api/tests/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(assignment ? { assignmentId: assignment.id } : libraryText ? { textId: libraryText.id } : {
+          mode: nextMode,
+          language: nextLanguage,
+          selectedDuration: nextMode === "time" ? nextDuration : undefined,
+          wordsCount: nextMode === "words" ? nextWordCount : undefined,
+        }),
+      });
+      if (!response.ok) throw new Error("challenge_failed");
+      const nextChallenge = await response.json() as TestChallenge;
+      setMode(nextChallenge.mode);
+      setLanguage(nextChallenge.language);
+      setDuration(nextChallenge.selectedDuration ?? nextDuration);
+      setWordCount(nextChallenge.wordsCount ?? nextWordCount);
+      setChallenge(nextChallenge);
+      setSessionKey((key) => key + 1);
+    } catch {
+      setChallengeError(true);
+    } finally {
+      setChallengeLoading(false);
+    }
+  }, [assignment, challengeLoading, libraryText]);
 
   const restart = useCallback(() => {
-    setExpectedText(fixedText?.text ?? makeText(mode, language, wordCount, expectedText));
-    setSessionKey((key) => key + 1);
-  }, [expectedText, fixedText?.text, language, mode, wordCount]);
+    void loadChallenge(mode, language, duration, wordCount);
+  }, [duration, language, loadChallenge, mode, wordCount]);
 
   function changeMode(next: TypingMode) {
-    setMode(next);
-    setExpectedText(makeText(next, language, wordCount, expectedText));
-    setSessionKey((key) => key + 1);
+    void loadChallenge(next, language, duration, wordCount);
   }
 
   function changeLanguage(next: Language) {
-    setLanguage(next);
-    setExpectedText(makeText(mode, next, wordCount, expectedText));
-    setSessionKey((key) => key + 1);
+    void loadChallenge(mode, next, duration, wordCount);
   }
 
   function changeDuration(next: number) {
-    setDuration(next);
-    setExpectedText(makeText(mode, language, wordCount, expectedText));
-    setSessionKey((key) => key + 1);
+    void loadChallenge(mode, language, next, wordCount);
   }
 
   function changeWordCount(next: number) {
-    setWordCount(next);
-    setExpectedText(makeText(mode, language, next, expectedText));
-    setSessionKey((key) => key + 1);
+    void loadChallenge(mode, language, duration, next);
   }
 
   async function toggleFullscreen() {
@@ -94,14 +113,19 @@ export function TypingPractice({ user, assignment, libraryText, initialText }: {
       <div className="pointer-events-none absolute left-1/2 top-28 h-72 w-[48rem] -translate-x-1/2 rounded-full bg-nova-accent/[0.035] blur-3xl" />
       <Header user={user} hidden={focusMode} />
       <main className={clsx("relative z-10 mx-auto flex w-full max-w-[1120px] flex-1 flex-col items-center px-5 pb-8", focusMode ? "justify-center pt-8" : "pt-10 sm:pt-14")}>
+        {challengeError && <div className="mb-5 w-full max-w-3xl rounded-xl border border-nova-error/25 bg-nova-error/5 px-4 py-3 text-center text-xs text-nova-error">Не удалось подготовить новый текст. Проверьте соединение и попробуйте ещё раз.</div>}
         <TypingSession
           key={sessionKey}
           mode={mode}
           duration={duration}
           wordCount={wordCount}
           language={language}
-          expectedText={expectedText}
+          expectedText={challenge.expectedText}
+          challengeToken={challenge.token}
+          clientAttemptId={challenge.clientAttemptId}
           assignmentId={assignment?.id}
+          textId={libraryText?.id}
+          practiceOnly={practiceOnly}
           restart={restart}
           controls={
             fixedText ? <div className="data-card mb-14 w-full max-w-3xl p-5 text-center sm:mb-20"><Link href={assignment ? "/assignments" : "/texts"} className="mb-2 inline-flex items-center gap-1 text-xs text-nova-muted transition hover:text-nova-text"><ArrowLeft size={13} /> {assignment ? t("typing.backAssignments") : t("typing.backTexts")}</Link><div className="text-sm font-semibold">{fixedText.title}</div><div className="mt-1 text-xs uppercase tracking-[0.14em] text-nova-accent">{t(`language.${fixedText.language}`)} · {t("typing.text")}</div></div> : <TestControls
@@ -113,6 +137,7 @@ export function TypingPractice({ user, assignment, libraryText, initialText }: {
               changeDuration={changeDuration}
               changeWordCount={changeWordCount}
               changeLanguage={changeLanguage}
+              disabled={challengeLoading}
             />
           }
         />
@@ -139,20 +164,21 @@ function TestControls(props: {
   changeDuration: (duration: number) => void;
   changeWordCount: (count: number) => void;
   changeLanguage: (language: Language) => void;
+  disabled: boolean;
 }) {
   const { t } = useI18n();
   return (
     <div className="mb-16 flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/[0.07] bg-[#141718]/90 p-1.5 text-[11px] font-medium shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:mb-20">
       {(["time", "words", "text"] as TypingMode[]).map((item) => (
-        <button key={item} onClick={() => props.changeMode(item)} className={clsx("test-option capitalize", props.mode === item && "test-option-active")}>{t(`typing.${item}`)}</button>
+        <button key={item} disabled={props.disabled} onClick={() => props.changeMode(item)} className={clsx("test-option capitalize", props.mode === item && "test-option-active")}>{t(`typing.${item}`)}</button>
       ))}
       <span className="mx-1 h-5 w-px bg-white/8" />
       {(props.mode === "time" ? [15, 30, 60, 120] : props.mode === "words" ? [10, 25, 50, 100] : []).map((value) => (
-        <button key={value} onClick={() => props.mode === "time" ? props.changeDuration(value) : props.changeWordCount(value)} className={clsx("test-option", (props.mode === "time" ? props.duration : props.wordCount) === value && "test-option-active")}>{value}{props.mode === "time" ? "s" : ""}</button>
+        <button key={value} disabled={props.disabled} onClick={() => props.mode === "time" ? props.changeDuration(value) : props.changeWordCount(value)} className={clsx("test-option", (props.mode === "time" ? props.duration : props.wordCount) === value && "test-option-active")}>{value}{props.mode === "time" ? "s" : ""}</button>
       ))}
       <span className="mx-1 h-5 w-px bg-white/8" />
       {(["en", "ru"] as Language[]).map((item) => (
-        <button key={item} onClick={() => props.changeLanguage(item)} className={clsx("test-option uppercase", props.language === item && "test-option-active")}>{item}</button>
+        <button key={item} disabled={props.disabled} onClick={() => props.changeLanguage(item)} className={clsx("test-option uppercase", props.language === item && "test-option-active")}>{item}</button>
       ))}
     </div>
   );
@@ -164,7 +190,11 @@ function TypingSession(props: {
   wordCount: number;
   language: Language;
   expectedText: string;
+  challengeToken: string;
+  clientAttemptId: string;
   assignmentId?: string;
+  textId?: string;
+  practiceOnly: boolean;
   restart: () => void;
   controls: React.ReactNode;
 }) {
@@ -172,7 +202,6 @@ function TypingSession(props: {
   const [saved, setSaved] = useState<SavedResult | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const attemptIdRef = useRef(crypto.randomUUID());
   const lastResultRef = useRef<(TypingStats & { pasteDetected: boolean; typedText: string }) | null>(null);
 
   const persistResult = useCallback(async (finalStats: TypingStats & { pasteDetected: boolean; typedText: string }) => {
@@ -186,7 +215,9 @@ function TypingSession(props: {
           body: JSON.stringify({
             mode: props.mode,
             assignmentId: props.assignmentId,
-            clientAttemptId: attemptIdRef.current,
+            textId: props.textId,
+            challengeToken: props.challengeToken,
+            clientAttemptId: props.clientAttemptId,
             language: props.language,
             selectedDuration: props.mode === "time" ? props.duration : undefined,
             wordsCount: props.mode === "words" ? props.wordCount : undefined,
@@ -207,7 +238,7 @@ function TypingSession(props: {
     }
     setSaving(false);
     setSaveError(true);
-  }, [props.assignmentId, props.duration, props.expectedText, props.language, props.mode, props.wordCount]);
+  }, [props.assignmentId, props.challengeToken, props.clientAttemptId, props.duration, props.expectedText, props.language, props.mode, props.textId, props.wordCount]);
 
   const saveResult = useCallback((finalStats: TypingStats & { pasteDetected: boolean; typedText: string }) => {
     lastResultRef.current = finalStats;
@@ -222,7 +253,7 @@ function TypingSession(props: {
     expectedText: props.expectedText,
     mode: props.mode,
     durationLimit: props.duration,
-    onFinish: saveResult,
+    onFinish: props.practiceOnly ? undefined : saveResult,
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -248,7 +279,7 @@ function TypingSession(props: {
           <ResultMetric value={`${stats.timeElapsed.toFixed(1)}s`} label={t("typing.timeLabel")} />
         </div>
         {saved && <div className="mt-5 grid w-full max-w-md grid-cols-2 gap-3"><LiveMetric value={saved.overallAverageWpm} label={`Overall average · ${saved.overallTestsCount} tests`} /><LiveMetric value={saved.languageAverageWpm} label={`${props.language.toUpperCase()} average · ${saved.languageTestsCount} tests`} /></div>}
-        <p className={clsx("mt-5 text-xs", saved ? "text-emerald-400" : saveError ? "text-nova-error" : "text-nova-muted")}>{saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
+        <p className={clsx("mt-5 text-xs", saved ? "text-emerald-400" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
         {saveError && <button className="mt-3 text-xs font-medium text-nova-accent hover:text-nova-text" onClick={retrySave}>{t("typing.retrySave")}</button>}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button onClick={props.restart} className="nova-button"><RotateCcw size={16} /> {t("typing.tryAgain")}</button>

@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 const actionLabels: Record<string, string> = {
   "student.created": "Student created",
@@ -19,6 +20,7 @@ const actionLabels: Record<string, string> = {
 };
 
 export default async function ActivityPage() {
+  await requireSuperAdminPage();
   const [activities, { locale }] = await Promise.all([prisma.adminActivity.findMany({ orderBy: { createdAt: "desc" }, take: 300 }), getI18n()]);
   const ui = locale === "uz" ? { title: "Amallar jurnali", subtitle: "Administratorning oxirgi 300 ta amali.", date: "Sana", admin: "Administrator", action: "Amal", details: "Tafsilotlar", empty: "Administrator amallari hali yo‘q." } : { title: "Журнал действий", subtitle: "Последние 300 действий администратора.", date: "Дата", admin: "Администратор", action: "Действие", details: "Подробности", empty: "Действий администратора пока нет." };
   return <div>

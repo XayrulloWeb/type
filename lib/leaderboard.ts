@@ -38,7 +38,9 @@ export async function getStudentRankings(period: Period, classId?: string, langu
       isRanked: true,
       ...(createdAt ? { createdAt: { gte: createdAt } } : {}),
       ...(language !== "all" ? { language } : { language: { in: ["ru", "en"] } }),
-      ...(classId ? { user: { classId, isActive: true } } : { user: { isActive: true } }),
+      ...(classId
+        ? { user: { classId, role: "STUDENT", isActive: true, archivedAt: null } }
+        : { user: { role: "STUDENT", isActive: true, archivedAt: null } }),
     },
     include: { user: { include: { class: true } } },
     orderBy: { createdAt: "desc" },

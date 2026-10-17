@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { calculateTypingStats, getRankingState } from "@/lib/typing";
+import { verifyTestChallenge } from "@/lib/test-challenge";
 
 const MODES = new Set(["time", "words", "text"]);
 const LANGUAGES = new Set(["en", "ru"]);
@@ -14,14 +15,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const activeUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { isActive: true, classId: true } });
-    if (!activeUser?.isActive) {
+    const activeUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, isActive: true, archivedAt: true, classId: true } });
+    if (!activeUser?.isActive || activeUser.archivedAt || activeUser.role !== "STUDENT") {
       return NextResponse.json({ error: "Account is not active." }, { status: 403 });
     }
 
     const body = (await request.json()) as Record<string, unknown>;
     const clientAttemptId = typeof body.clientAttemptId === "string" ? body.clientAttemptId : "";
     const assignmentId = typeof body.assignmentId === "string" && body.assignmentId ? body.assignmentId : null;
+    const textId = typeof body.textId === "string" && body.textId ? body.textId : null;
+    const challengeToken = typeof body.challengeToken === "string" ? body.challengeToken : "";
     const mode = typeof body.mode === "string" ? body.mode : "";
     const language = typeof body.language === "string" ? body.language : "";
     const expectedText = typeof body.expectedText === "string" ? body.expectedText : "";
@@ -31,8 +34,19 @@ export async function POST(request: Request) {
     const wordsCount = typeof body.wordsCount === "number" ? body.wordsCount : undefined;
     const focusLostCount = typeof body.focusLostCount === "number" ? Math.max(0, Math.round(body.focusLostCount)) : 0;
     const pasteDetected = body.pasteDetected === true;
+    const challenge = verifyTestChallenge(challengeToken);
 
     if (
+      !challenge ||
+      challenge.userId !== session.user.id ||
+      challenge.clientAttemptId !== clientAttemptId ||
+      challenge.mode !== mode ||
+      challenge.language !== language ||
+      challenge.expectedText !== expectedText ||
+      (challenge.assignmentId ?? null) !== assignmentId ||
+      (challenge.textId ?? null) !== textId ||
+      challenge.selectedDuration !== selectedDuration ||
+      challenge.wordsCount !== wordsCount ||
       !MODES.has(mode) ||
       !/^[0-9a-f-]{36}$/i.test(clientAttemptId) ||
       !LANGUAGES.has(language) ||
@@ -55,6 +69,13 @@ export async function POST(request: Request) {
       language !== assignment.text.language || expectedText !== assignment.text.content
     )) {
       return NextResponse.json({ error: "This assignment is not available to your account." }, { status: 403 });
+    }
+    const libraryText = textId ? await prisma.text.findUnique({ where: { id: textId } }) : null;
+    if (textId && (
+      !libraryText?.isActive || mode !== "text" || language !== libraryText.language || expectedText !== libraryText.content ||
+      !["ru", "en"].includes(libraryText.language)
+    )) {
+      return NextResponse.json({ error: "This text is not available." }, { status: 403 });
     }
 
     const existingResult = await prisma.testResult.findUnique({
@@ -91,7 +112,7 @@ export async function POST(request: Request) {
       countMissed: mode !== "time",
       focusLostCount,
     });
-    const ranking = getRankingState({ stats, selectedDuration, pasteDetected });
+    const ranking = getRankingState({ stats, mode: mode as "time" | "words" | "text", selectedDuration, pasteDetected });
 
     const previousBest = await prisma.testResult.findFirst({
       where: { userId: session.user.id, isRanked: true, language: { in: ["ru", "en"] } },

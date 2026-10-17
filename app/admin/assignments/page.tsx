@@ -3,8 +3,10 @@ import { Archive } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { archiveAssignment, createAssignment } from "./actions";
 import { getI18n } from "@/lib/i18n";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 export default async function AssignmentsAdminPage() {
+  await requireSuperAdminPage();
   const [classes, assignments, { locale, t }] = await Promise.all([
     prisma.class.findMany({ orderBy: [{ grade: "asc" }, { section: "asc" }] }),
     prisma.assignment.findMany({

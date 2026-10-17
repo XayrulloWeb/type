@@ -1,12 +1,24 @@
 import "server-only";
 import { randomInt } from "crypto";
 import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export async function requireSuperAdmin() {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.role !== "SUPER_ADMIN") return null;
+  const admin = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, isActive: true, archivedAt: true },
+  });
+  if (!admin?.isActive || admin.archivedAt || admin.role !== "SUPER_ADMIN") return null;
+  return session;
+}
+
+export async function requireSuperAdminPage() {
+  const session = await requireSuperAdmin();
+  if (!session) redirect("/login");
   return session;
 }
 

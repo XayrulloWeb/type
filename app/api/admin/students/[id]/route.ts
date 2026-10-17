@@ -49,7 +49,7 @@ export async function PATCH(request: Request, context: RouteContext<"/api/admin/
   const lastName = clean(body.lastName);
   const username = clean(body.username).toLowerCase();
   const className = clean(body.className).toUpperCase();
-  if (!firstName || !lastName || !/^[a-z0-9._-]{3,40}$/.test(username) || !className) {
+  if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !/^[a-z0-9._-]{3,40}$/.test(username) || !className) {
     return NextResponse.json({ error: "Fill in the name, username and class correctly." }, { status: 400 });
   }
   const [schoolClass, usernameOwner] = await Promise.all([
@@ -78,11 +78,11 @@ export async function DELETE(_request: Request, context: RouteContext<"/api/admi
   const { id } = await context.params;
   const student = await prisma.user.findUnique({
     where: { id },
-    include: { _count: { select: { testResults: true, assignmentResults: true } } },
+    include: { _count: { select: { testResults: true, assignmentResults: true, olympiadEntries: true } } },
   });
   if (!student || student.role !== "STUDENT") return NextResponse.json({ error: "Student not found." }, { status: 404 });
 
-  const hasHistory = student._count.testResults > 0 || student._count.assignmentResults > 0;
+  const hasHistory = student._count.testResults > 0 || student._count.assignmentResults > 0 || student._count.olympiadEntries > 0;
   try {
     if (hasHistory) {
       return NextResponse.json({ error: "This student has results. Archive the account instead of deleting it." }, { status: 409 });

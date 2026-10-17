@@ -8,11 +8,13 @@ import { adminActivity } from "@/lib/activity";
 export async function createClass(formData: FormData) {
   const session = await requireSuperAdmin();
   if (!session) return;
-  const name = String(formData.get("name") ?? "").trim().toUpperCase();
+  const requestedName = String(formData.get("name") ?? "").trim().toUpperCase().replace(/\s+/g, "");
   const grade = parseInt(formData.get("grade") as string);
   const section = String(formData.get("section") ?? "").trim().toUpperCase();
 
-  if (!name || Number.isNaN(grade) || grade < 1 || grade > 12 || !section) return;
+  if (Number.isNaN(grade) || grade < 1 || grade > 12 || !/^[A-Z]$/.test(section)) return;
+  const name = `${grade}${section}`;
+  if (requestedName && requestedName !== name) return;
 
   const existing = await prisma.class.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
   if (existing) return;

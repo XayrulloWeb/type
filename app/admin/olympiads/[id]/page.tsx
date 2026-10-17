@@ -4,8 +4,10 @@ import { ArrowLeft, FileDown, MonitorUp, Play, Sheet, Square } from "lucide-reac
 import { prisma } from "@/lib/db";
 import { AdminOlympiadMonitor } from "@/components/olympiads/AdminOlympiadMonitor";
 import { finishOlympiad, startOlympiad } from "../actions";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 export default async function AdminOlympiadPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireSuperAdminPage();
   const { id } = await params;
   const olympiad = await prisma.olympiad.findUnique({
     where: { id },

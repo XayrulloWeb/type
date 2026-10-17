@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { requireSuperAdminPage } from "@/lib/admin";
 import { getI18n } from "@/lib/i18n";
 import { getStudentRankings, type StudentRanking } from "@/lib/leaderboard";
 
@@ -21,25 +22,25 @@ function studentName(student: StudentRanking) {
 }
 
 export default async function AdminOverview() {
+  await requireSuperAdminPage();
   const { locale } = await getI18n();
   const ui = locale === "uz" ? { eyebrow: "Boshqaruv paneli", title: "Maktab holati", subtitle: "Maktabdagi mashqlar va faollikning umumiy ko‘rinishi.", students: "O‘quvchilar", assignments: "Faol topshiriqlar", classes: "Sinflar", today: "Bugungi testlar", total: "Jami testlar", accuracy: "O‘rtacha aniqlik", active: "Bugun faol", reviewLabel: "Tekshirish kerak", reviewMessage: "ta natijani tekshirish kerak.", schoolSpeed: "Maktabning o‘rtacha tezligi", schoolSpeedHelp: "Har bir o‘quvchining o‘rtacha natijasi asosida hisoblanadi.", leaders: "Maktab yetakchilari", leadersHelp: "Umumiy, rus va ingliz tillaridagi birinchi o‘rinlar.", firstPlaces: "Sinflar bo‘yicha birinchi o‘rinlar", noResult: "Hali natija yo‘q", overall: "Umumiy", classSpeed: "Sinflar bo‘yicha o‘rtacha tezlik", class: "Sinf", activeStudents: "Faol o‘quvchilar", tests: "Testlar", start: "Boshlash", one: "Sinflarni yarating", two: "O‘quvchilarni qo‘shing yoki import qiling", three: "Login va parollarni yuklab oling" } : { eyebrow: "Панель управления", title: "Обзор школы", subtitle: "Общая картина тренировок и активности в школе.", students: "Ученики", assignments: "Активные задания", classes: "Классы", today: "Тесты сегодня", total: "Всего тестов", accuracy: "Средняя точность", active: "Активны сегодня", reviewLabel: "Требуют проверки", reviewMessage: " результатов требуют проверки.", schoolSpeed: "Средняя скорость школы", schoolSpeedHelp: "Рассчитывается по среднему результату каждого ученика, без перекоса из-за количества тестов.", leaders: "Лидеры школы", leadersHelp: "Первые места в общем рейтинге, русском и английском языках.", firstPlaces: "Первые места по классам", noResult: "Пока нет результата", overall: "Общая", classSpeed: "Средняя скорость каждого класса", class: "Класс", activeStudents: "Активные ученики", tests: "Тесты", start: "С чего начать", one: "Создайте классы", two: "Добавьте или импортируйте учеников", three: "Скачайте логины и пароли" };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const [students, assignments, classCount, tests, testsToday, aggregate, activeToday, reviewCount, allRankings, ruRankings, enRankings, classRows] = await Promise.all([
-    prisma.user.count({ where: { role: "STUDENT" } }),
+  const [students, assignments, classCount, tests, testsToday, activeToday, reviewCount, allRankings, ruRankings, enRankings, classRows] = await Promise.all([
+    prisma.user.count({ where: { role: "STUDENT", isActive: true, archivedAt: null } }),
     prisma.assignment.count({ where: { isActive: true, text: { language: { in: ["ru", "en"] } } } }),
     prisma.class.count(),
-    prisma.testResult.count({ where: { language: { in: ["ru", "en"] } } }),
-    prisma.testResult.count({ where: { createdAt: { gte: today }, language: { in: ["ru", "en"] } } }),
-    prisma.testResult.aggregate({ where: { isRanked: true, language: { in: ["ru", "en"] } }, _avg: { wpm: true, accuracy: true } }),
-    prisma.testResult.groupBy({ by: ["userId"], where: { createdAt: { gte: today }, language: { in: ["ru", "en"] } } }),
-    prisma.testResult.count({ where: { reviewStatus: "pending", language: { in: ["ru", "en"] } } }),
+    prisma.testResult.count({ where: { language: { in: ["ru", "en"] }, user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
+    prisma.testResult.count({ where: { createdAt: { gte: today }, language: { in: ["ru", "en"] }, user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
+    prisma.testResult.groupBy({ by: ["userId"], where: { createdAt: { gte: today }, language: { in: ["ru", "en"] }, user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
+    prisma.testResult.count({ where: { reviewStatus: "pending", language: { in: ["ru", "en"] }, user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
     getStudentRankings("all", undefined, "all"),
     getStudentRankings("all", undefined, "ru"),
     getStudentRankings("all", undefined, "en"),
     prisma.class.findMany({
       orderBy: [{ grade: "asc" }, { section: "asc" }],
-      include: { _count: { select: { students: { where: { role: "STUDENT", isActive: true } } } } },
+      include: { _count: { select: { students: { where: { role: "STUDENT", isActive: true, archivedAt: null } } } } },
     }),
   ]);
   const overallAverage = averageSpeed(allRankings);
@@ -60,7 +61,7 @@ export default async function AdminOverview() {
   ];
   const stats = [
     [ui.students, students], [ui.assignments, assignments], [ui.classes, classCount], [ui.today, testsToday],
-    [ui.total, tests], [ui.accuracy, `${Math.round(aggregate._avg.accuracy ?? 0)}%`], [ui.active, activeToday.length], [ui.reviewLabel, reviewCount],
+    [ui.total, tests], [ui.accuracy, `${Math.round(allRankings.length ? allRankings.reduce((sum, student) => sum + student.averageAccuracy, 0) / allRankings.length : 0)}%`], [ui.active, activeToday.length], [ui.reviewLabel, reviewCount],
   ];
 
   return <div><p className="page-eyebrow">{ui.eyebrow}</p><h1 className="page-title">{ui.title}</h1><p className="page-subtitle">{ui.subtitle}</p>

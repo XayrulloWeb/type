@@ -12,9 +12,12 @@ set +a
 
 export NEXT_TELEMETRY_DISABLED=1
 export NODE_OPTIONS=--max-old-space-size=768
+export TZ="${TZ:-Asia/Tashkent}"
 
 cd "$source_dir"
 npm run build
+"$app_root/shared/backup-db.sh"
+npx prisma migrate deploy
 
 mkdir -p "$release_dir/.next"
 cp -a .next/standalone/. "$release_dir/"

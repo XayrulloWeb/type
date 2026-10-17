@@ -2,8 +2,10 @@ import { Archive, RotateCcw, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { createText, deleteText, toggleText } from "./actions";
 import { getI18n } from "@/lib/i18n";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 export default async function AdminTextsPage() {
+  await requireSuperAdminPage();
   const [texts, { locale, t }] = await Promise.all([prisma.text.findMany({ where: { language: { in: ["ru", "en"] } }, include: { _count: { select: { assignments: true } } }, orderBy: [{ grade: "asc" }, { language: "asc" }, { createdAt: "desc" }] }), getI18n()]);
   const ui = locale === "uz" ? { eyebrow: "Kontent kutubxonasi", title: "O‘quv matnlari", subtitle: "Matnlarni sinf, til va qiyinlik bo‘yicha boshqaring.", add: "Matn qo‘shish", name: "Nomi", grade: "Sinf", content: "O‘quv matni…", addButton: "Kutubxonaga qo‘shish", text: "Matn", status: "Holat", assignments: "Topshiriqlar", empty: "Hali o‘quv matnlari yo‘q." } : { eyebrow: "Библиотека материалов", title: "Учебные тексты", subtitle: "Управляйте текстами по классу, языку и сложности.", add: "Добавить текст", name: "Название", grade: "Класс", content: "Учебный текст…", addButton: "Добавить в библиотеку", text: "Текст", status: "Статус", assignments: "Задания", empty: "Учебных текстов пока нет." };
   return <div>

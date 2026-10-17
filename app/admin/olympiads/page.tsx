@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { Trophy } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { createOlympiad } from "./actions";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 const statusLabels: Record<string, string> = {
   WAITING: "Ожидание",
@@ -12,11 +13,12 @@ const statusLabels: Record<string, string> = {
 };
 
 export default async function AdminOlympiadsPage() {
+  await requireSuperAdminPage();
   const [classes, olympiads] = await Promise.all([
     prisma.class.findMany({
       where: { grade: { in: [5, 6, 7] } },
       orderBy: [{ grade: "asc" }, { section: "asc" }],
-      include: { _count: { select: { students: { where: { role: "STUDENT", isActive: true } } } } },
+      include: { _count: { select: { students: { where: { role: "STUDENT", isActive: true, archivedAt: null } } } } },
     }),
     prisma.olympiad.findMany({
       include: {

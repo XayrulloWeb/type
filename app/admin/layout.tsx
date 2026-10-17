@@ -1,16 +1,13 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BarChart3, ExternalLink, Sparkles } from "lucide-react";
-import { authOptions } from "@/lib/auth";
+import { requireSuperAdminPage } from "@/lib/admin";
 import { SignOutButton } from "@/components/SignOutButton";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { getI18n } from "@/lib/i18n";
 import { AdminNavigation } from "@/components/admin/AdminNavigation";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.role !== "SUPER_ADMIN") redirect("/login");
+  await requireSuperAdminPage();
   const { t } = await getI18n();
   const nav = [
     { href: "/admin", label: t("admin.overview"), icon: "gauge" as const },

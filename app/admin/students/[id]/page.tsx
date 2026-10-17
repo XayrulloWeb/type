@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, BarChart3, CalendarClock, CircleUserRound, Medal, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getStudentRankings, type LanguageFilter, type StudentRanking } from "@/lib/leaderboard";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 interface StudentDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,7 @@ const languageCards: Array<{ value: LanguageFilter; label: string }> = [
 ];
 
 export default async function StudentDetailsPage({ params }: StudentDetailsPageProps) {
+  await requireSuperAdminPage();
   const { id } = await params;
   const student = await prisma.user.findFirst({
     where: { id, role: "STUDENT" },

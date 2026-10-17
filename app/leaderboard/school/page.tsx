@@ -14,11 +14,11 @@ export default async function SchoolLeaderboardPage({ searchParams }: { searchPa
   const [filters, { t }] = await Promise.all([searchParams, getI18n()]);
   const period = normalizePeriod(filters.period);
   const language = normalizeLanguage(filters.language);
-  const [results, studentCount, testCount] = await Promise.all([
+  const [results, studentCount] = await Promise.all([
     getStudentRankings(period, undefined, language),
-    prisma.user.count({ where: { role: "STUDENT", isActive: true } }),
-    prisma.testResult.count({ where: { language: { in: ["ru", "en"] } } }),
+    prisma.user.count({ where: { role: "STUDENT", isActive: true, archivedAt: null } }),
   ]);
+  const testCount = results.reduce((sum, item) => sum + item.testsCount, 0);
   const averageWpm = results.length ? Math.round(results.reduce((sum, item) => sum + item.averageWpm, 0) / results.length) : 0;
   const averageAccuracy = results.length ? results.reduce((sum, item) => sum + item.averageAccuracy, 0) / results.length : 0;
 

@@ -11,7 +11,7 @@ export default async function OlympiadsPage() {
   if (!session?.user) redirect("/login");
   if (session.user.role === "SUPER_ADMIN") redirect("/admin/olympiads");
   const student = await prisma.user.findUnique({ where: { id: session.user.id }, include: { class: true } });
-  if (!student?.isActive) redirect("/login");
+  if (!student?.isActive || student.archivedAt || student.role !== "STUDENT") redirect("/login");
 
   const olympiads = student.classId && student.class && [5, 6, 7].includes(student.class.grade) ? await prisma.olympiad.findMany({
     where: { targetClasses: { some: { classId: student.classId } }, status: { in: ["WAITING", "RUNNING", "FINISHED"] } },

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BarChart3, Medal, School, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getStudentRankings, normalizeLanguage, type LanguageFilter, type StudentRanking } from "@/lib/leaderboard";
+import { requireSuperAdminPage } from "@/lib/admin";
 
 interface RankingPageProps {
   searchParams: Promise<{ classId?: string; language?: string }>;
@@ -14,6 +15,7 @@ const languages: Array<{ value: LanguageFilter; label: string; shortLabel: strin
 ];
 
 export default async function AdminRankingPage({ searchParams }: RankingPageProps) {
+  await requireSuperAdminPage();
   const [filters, classes] = await Promise.all([
     searchParams,
     prisma.class.findMany({
