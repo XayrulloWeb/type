@@ -67,7 +67,6 @@ export function getRankingState(input: {
   pasteDetected?: boolean;
 }) {
   const reasons: string[] = [];
-  if (input.stats.accuracy < 90) reasons.push("accuracy_below_90");
   const minimumRankedDuration = input.selectedDuration === 15 ? 14 : 29;
   if (input.stats.timeElapsed < minimumRankedDuration) reasons.push("duration_too_short");
   if (input.selectedDuration && input.selectedDuration >= 30 && input.stats.timeElapsed < input.selectedDuration - 1) {
