@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Keyboard, LockKeyhole, ShieldCheck, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Keyboard, LockKeyhole, ShieldCheck, Sparkles, Trophy } from "lucide-react";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { useI18n } from "@/components/LocaleProvider";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -81,15 +82,26 @@ export default function LoginPage() {
             />
             </label>
             <label className="block"><span className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-nova-muted">{t("login.password")}</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              required
-              placeholder={t("login.password")}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="nova-input"
-            />
+            <span className="relative block">
+              <input
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                placeholder={t("login.password")}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="nova-input pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-nova-muted transition hover:text-nova-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nova-accent/60"
+                aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
+                title={t(showPassword ? "login.hidePassword" : "login.showPassword")}
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </span>
             </label>
           </div>
 
