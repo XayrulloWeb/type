@@ -2,7 +2,13 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./db";
 import bcrypt from "bcrypt";
-import { canAttemptLogin, clearFailedLogins, recordFailedLogin } from "./rate-limit";
+import { clearFailedLogins, recordFailedLogin } from "./rate-limit";
+
+async function rejectFailedLogin(username: string) {
+  const delay = recordFailedLogin(username);
+  if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+  return null;
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,7 +24,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         const username = credentials.username.trim().toLowerCase();
-        if (!canAttemptLogin(username)) return null;
 
         const user = await prisma.user.findUnique({
           where: { username },
@@ -26,8 +31,7 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.isActive) {
-          recordFailedLogin(username);
-          return null;
+          return rejectFailedLogin(username);
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -36,8 +40,7 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isPasswordValid) {
-          recordFailedLogin(username);
-          return null;
+          return rejectFailedLogin(username);
         }
 
         clearFailedLogins(username);

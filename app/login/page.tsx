@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Keyboard, LockKeyhole, ShieldCheck, Sparkles, Trophy } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Keyboard, LockKeyhole, ShieldCheck, Sparkles, TriangleAlert, Trophy } from "lucide-react";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { useI18n } from "@/components/LocaleProvider";
 
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -90,6 +91,9 @@ export default function LoginPage() {
                 placeholder={t("login.password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
+                onKeyUp={(e) => setCapsLockOn(e.getModifierState("CapsLock"))}
+                onBlur={() => setCapsLockOn(false)}
                 className="nova-input pr-12"
               />
               <button
@@ -102,6 +106,7 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </span>
+            {capsLockOn && <span className="mt-2 flex items-center gap-2 text-xs font-medium text-amber-400" role="status" aria-live="polite"><TriangleAlert size={14} /> {t("login.capsLock")}</span>}
             </label>
           </div>
 
