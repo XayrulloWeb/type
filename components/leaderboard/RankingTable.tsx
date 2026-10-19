@@ -13,8 +13,8 @@ export function RankingTable({ results, currentUserId, showClass = false }: { re
             <th className="px-5 py-4 text-center">#</th>
             <th className="px-5 py-4">{t("leaderboard.student")}</th>
             {showClass && <th className="px-5 py-4">{t("common.class")}</th>}
-            <th className="px-5 py-4 text-right">{t("leaderboard.avgWpm")}</th>
             <th className="px-5 py-4 text-right">{t("leaderboard.bestWpm")}</th>
+            <th className="px-5 py-4 text-right">{t("leaderboard.avgWpm")}</th>
             <th className="px-5 py-4 text-right">{t("typing.accuracy")}</th>
             <th className="px-5 py-4 text-right">{t("leaderboard.tests")}</th>
           </tr>
@@ -25,8 +25,8 @@ export function RankingTable({ results, currentUserId, showClass = false }: { re
               <td className="px-5 py-4 text-center"><span className={index < 3 ? "inline-grid h-6 w-6 place-items-center rounded-full bg-nova-accent/12 text-[11px] font-bold text-nova-accent" : "text-nova-muted"}>{index + 1}</span></td>
               <td className="px-5 py-4 font-medium text-nova-text">{result.user.firstName} {result.user.lastName}{result.userId === currentUserId && <span className="ml-2 text-[10px] text-nova-accent">{t("leaderboard.you")}</span>}</td>
               {showClass && <td className="px-5 py-4 text-nova-muted">{result.user.class?.name ?? "—"}</td>}
-              <td className="px-5 py-4 text-right font-semibold text-nova-accent">{result.averageWpm}</td>
-              <td className="px-5 py-4 text-right text-nova-text">{result.bestWpm}</td>
+              <td className="px-5 py-4 text-right font-semibold text-nova-accent">{result.bestWpm}</td>
+              <td className="px-5 py-4 text-right text-nova-text">{result.averageWpm}</td>
               <td className="px-5 py-4 text-right text-nova-muted">{result.averageAccuracy.toFixed(0)}%</td>
               <td className="px-5 py-4 text-right text-nova-muted">{result.testsCount}</td>
             </tr>

@@ -82,7 +82,7 @@ export async function getStudentRankings(period: Period, classId?: string, langu
       testsCount: item.testsCount,
       lastActiveAt: item.lastActiveAt,
     }))
-    .sort((a, b) => b.averageWpm - a.averageWpm || b.averageAccuracy - a.averageAccuracy || b.bestWpm - a.bestWpm);
+    .sort((a, b) => b.bestWpm - a.bestWpm || b.averageAccuracy - a.averageAccuracy || b.averageWpm - a.averageWpm);
 }
 
 export async function getClassRankings(period: Period, language: LanguageFilter = "all") {
