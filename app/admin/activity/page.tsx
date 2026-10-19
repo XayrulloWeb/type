@@ -17,6 +17,8 @@ const actionLabels: Record<string, string> = {
   "assignment.archived": "Assignment archived",
   "result.approved": "Result approved",
   "result.rejected": "Result rejected",
+  "result.annulled": "Результат аннулирован",
+  "result.restored": "Результат возвращён",
 };
 
 export default async function ActivityPage() {
