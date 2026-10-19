@@ -11,6 +11,7 @@ import { useTypingEngine, type TypingMode } from "@/hooks/useTypingEngine";
 import type { TypingStats } from "@/lib/typing";
 import type { TestChallenge } from "@/lib/test-challenge";
 import { useI18n } from "@/components/LocaleProvider";
+import { SpeedStandardCard } from "@/components/SpeedStandardCard";
 
 type Language = "en" | "ru";
 
@@ -39,7 +40,7 @@ interface LibraryPractice {
   language: Language;
 }
 
-export function TypingPractice({ user, assignment, libraryText, initialChallenge, practiceOnly = false }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; practiceOnly?: boolean }) {
+export function TypingPractice({ user, assignment, libraryText, initialChallenge, practiceOnly = false, speedStandard }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; practiceOnly?: boolean; speedStandard?: { grade: number; averageWpm: number } }) {
   const fixedText = assignment ?? libraryText;
   const { t } = useI18n();
   const [mode, setMode] = useState<TypingMode>(initialChallenge.mode);
@@ -126,9 +127,10 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
           assignmentId={assignment?.id}
           textId={libraryText?.id}
           practiceOnly={practiceOnly}
+          speedStandard={speedStandard}
           restart={restart}
           controls={
-            fixedText ? <div className="data-card mb-14 w-full max-w-3xl p-5 text-center sm:mb-20"><Link href={assignment ? "/assignments" : "/texts"} className="mb-2 inline-flex items-center gap-1 text-xs text-nova-muted transition hover:text-nova-text"><ArrowLeft size={13} /> {assignment ? t("typing.backAssignments") : t("typing.backTexts")}</Link><div className="text-sm font-semibold">{fixedText.title}</div><div className="mt-1 text-xs uppercase tracking-[0.14em] text-nova-accent">{t(`language.${fixedText.language}`)} · {t("typing.text")}</div></div> : <TestControls
+            <>{speedStandard && <SpeedStandardCard grade={speedStandard.grade} averageWpm={speedStandard.averageWpm} compact className="mb-4" />}{fixedText ? <div className="data-card mb-14 w-full max-w-3xl p-5 text-center sm:mb-20"><Link href={assignment ? "/assignments" : "/texts"} className="mb-2 inline-flex items-center gap-1 text-xs text-nova-muted transition hover:text-nova-text"><ArrowLeft size={13} /> {assignment ? t("typing.backAssignments") : t("typing.backTexts")}</Link><div className="text-sm font-semibold">{fixedText.title}</div><div className="mt-1 text-xs uppercase tracking-[0.14em] text-nova-accent">{t(`language.${fixedText.language}`)} · {t("typing.text")}</div></div> : <TestControls
               mode={mode}
               duration={duration}
               wordCount={wordCount}
@@ -138,7 +140,7 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
               changeWordCount={changeWordCount}
               changeLanguage={changeLanguage}
               disabled={challengeLoading}
-            />
+            />}</>
           }
         />
       </main>
@@ -195,6 +197,7 @@ function TypingSession(props: {
   assignmentId?: string;
   textId?: string;
   practiceOnly: boolean;
+  speedStandard?: { grade: number; averageWpm: number };
   restart: () => void;
   controls: React.ReactNode;
 }) {
@@ -279,6 +282,7 @@ function TypingSession(props: {
           <ResultMetric value={`${stats.timeElapsed.toFixed(1)}s`} label={t("typing.timeLabel")} />
         </div>
         {saved && <div className="mt-5 grid w-full max-w-md grid-cols-2 gap-3"><LiveMetric value={saved.overallAverageWpm} label={`Overall average · ${saved.overallTestsCount} tests`} /><LiveMetric value={saved.languageAverageWpm} label={`${props.language.toUpperCase()} average · ${saved.languageTestsCount} tests`} /></div>}
+        {saved && props.speedStandard && <SpeedStandardCard grade={props.speedStandard.grade} averageWpm={saved.overallAverageWpm} compact className="mt-5" />}
         <p className={clsx("mt-5 text-xs", saved ? "text-emerald-400" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
         {saveError && <button className="mt-3 text-xs font-medium text-nova-accent hover:text-nova-text" onClick={retrySave}>{t("typing.retrySave")}</button>}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
