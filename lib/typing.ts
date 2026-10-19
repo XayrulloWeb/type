@@ -1,3 +1,5 @@
+import { typingCharacters } from "@/lib/typing-text";
+
 export interface TypingStats {
   wpm: number;
   rawWpm: number;
@@ -28,14 +30,16 @@ export function calculateTypingStats({
   let correctChars = 0;
   let incorrectChars = 0;
 
-  const comparableLength = Math.min(expectedText.length, typedText.length);
+  const expectedChars = typingCharacters(expectedText);
+  const typedChars = typingCharacters(typedText);
+  const comparableLength = Math.min(expectedChars.length, typedChars.length);
   for (let index = 0; index < comparableLength; index += 1) {
-    if (typedText[index] === expectedText[index]) correctChars += 1;
+    if (typedChars[index] === expectedChars[index]) correctChars += 1;
     else incorrectChars += 1;
   }
 
-  const extraChars = Math.max(0, typedText.length - expectedText.length);
-  const missedChars = countMissed ? Math.max(0, expectedText.length - typedText.length) : 0;
+  const extraChars = Math.max(0, typedChars.length - expectedChars.length);
+  const missedChars = countMissed ? Math.max(0, expectedChars.length - typedChars.length) : 0;
   const totalTyped = correctChars + incorrectChars + extraChars;
   const safeDuration = Math.max(0, durationSeconds);
   const minutes = safeDuration / 60;

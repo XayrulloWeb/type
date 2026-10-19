@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import clsx from "clsx";
 import type { TypingStatus } from "@/hooks/useTypingEngine";
+import { typingCharacters } from "@/lib/typing-text";
 
 interface TypingAreaProps {
   expectedText: string;
@@ -11,12 +12,14 @@ interface TypingAreaProps {
 }
 
 export function TypingArea({ expectedText, typedText, status }: TypingAreaProps) {
-  const expectedChars = useMemo(() => expectedText.split(""), [expectedText]);
+  const expectedChars = useMemo(() => typingCharacters(expectedText), [expectedText]);
+  const typedChars = useMemo(() => typingCharacters(typedText), [typedText]);
+  const typedLength = typedChars.length;
   const currentRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     currentRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [typedText.length]);
+  }, [typedLength]);
 
   return (
     <div
@@ -28,11 +31,12 @@ export function TypingArea({ expectedText, typedText, status }: TypingAreaProps)
     >
       <div className="typing-copy select-none break-words text-center font-mono text-[clamp(1.35rem,2.2vw,2rem)] leading-[1.6] tracking-[0.025em]">
         {expectedChars.map((char, index) => {
-          const typedChar = typedText[index];
-          const isTyped = index < typedText.length;
+          const typedChar = typedChars[index];
+          const isTyped = index < typedLength;
           const isCorrect = isTyped && typedChar === char;
           const isIncorrect = isTyped && typedChar !== char;
-          const isCurrent = index === typedText.length && status !== "finished";
+          const isCurrent = index === typedLength && status !== "finished";
+          const visibleChar = isIncorrect ? (typedChar === " " ? "_" : typedChar) : char;
 
           return (
             <span
@@ -45,7 +49,7 @@ export function TypingArea({ expectedText, typedText, status }: TypingAreaProps)
                 isIncorrect && "text-nova-error",
               )}
             >
-              {char === " " && isIncorrect ? "_" : char}
+              {visibleChar}
               {isCurrent && <span aria-hidden className="nova-caret absolute left-0 top-[10%] h-[80%] w-[2px] bg-nova-accent" />}
             </span>
           );

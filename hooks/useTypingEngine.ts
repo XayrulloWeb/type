@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { calculateTypingStats, type TypingStats } from "@/lib/typing";
+import { normalizeTypingKey, typingCharacters } from "@/lib/typing-text";
 
 export type TypingStatus = "idle" | "running" | "finished";
 export type TypingMode = "time" | "words" | "text";
@@ -31,6 +32,7 @@ export function useTypingEngine({
   const finishedRef = useRef(false);
   const submittedRef = useRef(false);
   const onFinishRef = useRef(onFinish);
+  const expectedLength = useMemo(() => typingCharacters(expectedText).length, [expectedText]);
 
   useEffect(() => {
     onFinishRef.current = onFinish;
@@ -104,11 +106,13 @@ export function useTypingEngine({
 
       if (event.key === "Backspace") {
         event.preventDefault();
-        setTyped((current) => current.slice(0, -1));
+        setTyped((current) => typingCharacters(current).slice(0, -1).join(""));
         return;
       }
 
-      if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+      const input = normalizeTypingKey(event.key);
+      if (!input) return;
 
       event.preventDefault();
       if (status === "idle") {
@@ -117,12 +121,12 @@ export function useTypingEngine({
       }
 
       setTyped((current) => {
-        const next = current + event.key;
-        if (mode !== "time" && next.length >= expectedText.length) {
+        const nextChars = [...typingCharacters(current), ...typingCharacters(input)];
+        if (mode !== "time" && nextChars.length >= expectedLength) {
           window.setTimeout(finish, 0);
-          return next.slice(0, expectedText.length);
+          return nextChars.slice(0, expectedLength).join("");
         }
-        return next;
+        return nextChars.join("");
       });
     };
 
@@ -139,7 +143,7 @@ export function useTypingEngine({
       window.removeEventListener("paste", blockTransfer);
       window.removeEventListener("drop", blockTransfer);
     };
-  }, [expectedText.length, finish, mode, status]);
+  }, [expectedLength, finish, mode, status]);
 
   useEffect(() => {
     const handleBlur = () => {

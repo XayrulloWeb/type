@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { calculateTypingStats, getRankingState } from "@/lib/typing";
 import { verifyTestChallenge } from "@/lib/test-challenge";
+import { prepareTypingText } from "@/lib/typing-text";
 
 const MODES = new Set(["time", "words", "text"]);
 const LANGUAGES = new Set(["en", "ru"]);
@@ -66,13 +67,13 @@ export async function POST(request: Request) {
     }) : null;
     if (assignmentId && (
       !assignment?.isActive || assignment.classId !== activeUser.classId || mode !== "text" ||
-      language !== assignment.text.language || expectedText !== assignment.text.content
+      language !== assignment.text.language || expectedText !== prepareTypingText(assignment.text.content)
     )) {
       return NextResponse.json({ error: "This assignment is not available to your account." }, { status: 403 });
     }
     const libraryText = textId ? await prisma.text.findUnique({ where: { id: textId } }) : null;
     if (textId && (
-      !libraryText?.isActive || mode !== "text" || language !== libraryText.language || expectedText !== libraryText.content ||
+      !libraryText?.isActive || mode !== "text" || language !== libraryText.language || expectedText !== prepareTypingText(libraryText.content) ||
       !["ru", "en"].includes(libraryText.language)
     )) {
       return NextResponse.json({ error: "This text is not available." }, { status: 403 });

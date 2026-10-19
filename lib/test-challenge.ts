@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { getPreparedText, getRandomWords } from "@/lib/words";
+import { prepareTypingText } from "@/lib/typing-text";
 
 export type TestMode = "time" | "words" | "text";
 export type TestLanguage = "en" | "ru";
@@ -50,9 +51,10 @@ export function createTestChallenge(input: {
   assignmentId?: string;
   textId?: string;
 }): TestChallenge {
-  const expectedText = input.expectedText ?? (input.mode === "text"
+  const sourceText = input.expectedText ?? (input.mode === "text"
     ? getPreparedText(input.language)
     : getRandomWords(input.language, input.mode === "time" ? 260 : input.wordsCount ?? 25));
+  const expectedText = prepareTypingText(sourceText);
   const payload: ChallengePayload = {
     version: 1,
     userId: input.userId,

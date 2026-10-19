@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Clock3, Medal, ShieldCheck, Trophy, Users } from "lucide-react";
 import { TypingArea } from "@/components/typing/TypingArea";
 import { calculateTypingStats } from "@/lib/typing";
+import { normalizeTypingKey, normalizeTypingText, typingCharacters } from "@/lib/typing-text";
 
 interface AttemptSummary { attemptNumber: number; wpm: number; accuracy: number; needsReview: boolean; }
 interface Standing {
@@ -36,6 +37,7 @@ export function OlympiadRoom({ olympiadId, currentUserId }: { olympiadId: string
   const [localResults, setLocalResults] = useState<LocalResult[]>([]);
   const joinedRef = useRef(false);
   const submittedRef = useRef(false);
+  const expectedLength = useMemo(() => typingCharacters(competitionText ?? "").length, [competitionText]);
 
   const load = useCallback(async () => {
     const response = await fetch(`/api/olympiads/${olympiadId}`, { cache: "no-store" });
@@ -46,7 +48,7 @@ export function OlympiadRoom({ olympiadId, currentUserId }: { olympiadId: string
     setRoom(next);
     if (next.attemptNumber && next.attemptText && next.attemptNumber !== activeAttempt) {
       setActiveAttempt(next.attemptNumber);
-      setCompetitionText(next.attemptText);
+      setCompetitionText(normalizeTypingText(next.attemptText));
       setTyped("");
       setFocusLostCount(0);
       setPasteDetected(false);
@@ -106,15 +108,17 @@ export function OlympiadRoom({ olympiadId, currentUserId }: { olympiadId: string
     if (!active || !competitionText) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") { event.preventDefault(); setPasteDetected(true); return; }
-      if (event.key === "Backspace") { event.preventDefault(); setTyped((value) => value.slice(0, -1)); return; }
-      if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return;
+      if (event.key === "Backspace") { event.preventDefault(); setTyped((value) => typingCharacters(value).slice(0, -1).join("")); return; }
+      if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+      const input = normalizeTypingKey(event.key);
+      if (!input) return;
       event.preventDefault();
-      setTyped((value) => { const next = (value + event.key).slice(0, competitionText.length); if (next.length >= competitionText.length) window.setTimeout(() => void submit(next), 0); return next; });
+      setTyped((value) => { const next = [...typingCharacters(value), ...typingCharacters(input)].slice(0, expectedLength).join(""); if (typingCharacters(next).length >= expectedLength) window.setTimeout(() => void submit(next), 0); return next; });
     };
     const blockTransfer = (event: Event) => { event.preventDefault(); setPasteDetected(true); };
     window.addEventListener("keydown", handleKeyDown); window.addEventListener("paste", blockTransfer); window.addEventListener("drop", blockTransfer);
     return () => { window.removeEventListener("keydown", handleKeyDown); window.removeEventListener("paste", blockTransfer); window.removeEventListener("drop", blockTransfer); };
-  }, [active, competitionText, submit]);
+  }, [active, competitionText, expectedLength, submit]);
   useEffect(() => { if (!active) return; const onBlur = () => setFocusLostCount((value) => value + 1); window.addEventListener("blur", onBlur); return () => window.removeEventListener("blur", onBlur); }, [active]);
   useEffect(() => {
     if (!competitionText || !attemptStart || officialNow < attemptStart || timeLeft !== 0 || submitted) return;
