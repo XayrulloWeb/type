@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { calculateTypingStats, getRankingState } from "@/lib/typing";
+import { calculateTypingStats, getRankingState, MINIMUM_RANKED_ACCURACY } from "@/lib/typing";
 import { verifyTestChallenge } from "@/lib/test-challenge";
 import { prepareTypingText } from "@/lib/typing-text";
 
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
 
     const existingResult = await prisma.testResult.findUnique({
       where: { clientAttemptId },
-      select: { id: true, userId: true, isRanked: true, wpm: true },
+      select: { id: true, userId: true, isRanked: true, wpm: true, accuracy: true },
     });
     if (existingResult) {
       if (existingResult.userId !== session.user.id) {
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         languageAverageWpm: Math.round(languageAverage._avg.wpm ?? 0),
         languageTestsCount: languageAverage._count._all,
         assignmentCompleted: assignmentResult?.status === "completed",
-        reviewReasons: [],
+        reviewReasons: existingResult.accuracy < MINIMUM_RANKED_ACCURACY ? ["accuracy_too_low"] : [],
       });
     }
 
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
           missedChars: stats.missedChars,
           focusLostCount: stats.focusLostCount,
           isRanked: ranking.isRanked,
-          reviewStatus: ranking.isRanked ? null : "pending",
+          reviewStatus: ranking.isRanked ? null : ranking.reasons.includes("accuracy_too_low") ? "rejected" : "pending",
         },
         select: { id: true, isRanked: true, wpm: true },
       });
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
           where: { assignmentId_userId: { assignmentId: assignment.id, userId: session.user.id } },
           select: { status: true },
         });
-        const meetsRequirements =
+        const meetsRequirements = ranking.isRanked &&
           (assignment.minimumWpm === null || stats.wpm >= assignment.minimumWpm) &&
           (assignment.minimumAccuracy === null || stats.accuracy >= assignment.minimumAccuracy);
         assignmentCompleted = meetsRequirements || previous?.status === "completed";

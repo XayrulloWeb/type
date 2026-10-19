@@ -3,15 +3,20 @@
 import { useFormStatus } from "react-dom";
 import { RotateCcw, ShieldX } from "lucide-react";
 import { reviewResult } from "@/app/admin/review/actions";
+import { MINIMUM_RANKED_ACCURACY } from "@/lib/typing";
 
 interface ResultModerationControlsProps {
   resultId: string;
   isRanked: boolean;
   reviewStatus: string | null;
   wpm: number;
+  accuracy: number;
 }
 
-export function ResultModerationControls({ resultId, isRanked, reviewStatus, wpm }: ResultModerationControlsProps) {
+export function ResultModerationControls({ resultId, isRanked, reviewStatus, wpm, accuracy }: ResultModerationControlsProps) {
+  if (!isRanked && accuracy < MINIMUM_RANKED_ACCURACY) {
+    return <div className="text-right text-xs text-amber-300">Автоматически исключён<br /><span className="text-[10px] text-nova-muted">минимум {MINIMUM_RANKED_ACCURACY}% точности</span></div>;
+  }
   if (!isRanked) {
     const label = reviewStatus === "rejected" ? "Вернуть в рейтинг" : "Одобрить";
     return <form

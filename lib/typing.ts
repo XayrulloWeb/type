@@ -1,5 +1,7 @@
 import { typingCharacters } from "@/lib/typing-text";
 
+export const MINIMUM_RANKED_ACCURACY = 70;
+
 export interface TypingStats {
   wpm: number;
   rawWpm: number;
@@ -80,6 +82,7 @@ export function getRankingState(input: {
     }
   }
   if (input.stats.wpm > 220 || input.stats.rawWpm > 260) reasons.push("unrealistic_speed");
+  if (input.stats.accuracy < MINIMUM_RANKED_ACCURACY) reasons.push("accuracy_too_low");
   if (input.stats.focusLostCount > 3) reasons.push("focus_lost");
   if (input.pasteDetected) reasons.push("paste_attempt");
 

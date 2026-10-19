@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Medal, Trophy, Users } from "lucide-react";
+import { MINIMUM_RANKED_ACCURACY } from "@/lib/typing";
 
 interface Entry { id: string; name: string; className: string; grade: number | null; wpm: number | null; accuracy: number | null; hasResult: boolean; attemptsCompleted: number[]; disqualified: boolean; }
 interface Board { title: string; status: string; phase: string; attemptNumber: number | null; attemptStartedAt: string | null; attemptEndsAt: string | null; scheduledAt: string | null; durationSeconds: number; attemptLimit: number; eligibleCount: number; joinedCount: number; finishedCount: number; participants: Entry[]; }
@@ -22,7 +23,7 @@ export function ProjectorBoard({ olympiadId }: { olympiadId: string }) {
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 250); return () => window.clearInterval(timer); }, []);
   if (!board) return <div className="grid min-h-screen place-items-center bg-nova-bg text-nova-muted">Подключение к табло…</div>;
 
-  const valid = board.participants.filter((item) => item.hasResult && !item.disqualified).sort((a, b) => (b.wpm ?? 0) - (a.wpm ?? 0) || (b.accuracy ?? 0) - (a.accuracy ?? 0));
+  const valid = board.participants.filter((item) => item.hasResult && (item.accuracy ?? 0) >= MINIMUM_RANKED_ACCURACY && !item.disqualified).sort((a, b) => (b.wpm ?? 0) - (a.wpm ?? 0) || (b.accuracy ?? 0) - (a.accuracy ?? 0));
   const winners = [5, 6, 7].map((grade) => ({ grade, winner: valid.find((item) => item.grade === grade) }));
   const teams = [...valid.reduce((map, item) => { const team = map.get(item.className) ?? { name: item.className, count: 0, total: 0 }; team.count += 1; team.total += item.wpm ?? 0; map.set(item.className, team); return map; }, new Map<string, { name: string; count: number; total: number }>()).values()].map((team) => ({ ...team, average: Math.round(team.total / team.count) })).sort((a, b) => b.average - a.average);
   const target = board.phase === "COUNTDOWN" || board.phase === "BREAK" ? board.attemptStartedAt : board.attemptEndsAt;

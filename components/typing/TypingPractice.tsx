@@ -26,6 +26,7 @@ interface SavedResult {
   languageAverageWpm: number;
   languageTestsCount: number;
   assignmentCompleted?: boolean;
+  reviewReasons?: string[];
 }
 
 interface AssignmentPractice {
@@ -284,8 +285,8 @@ function TypingSession(props: {
           <ResultMetric value={`${stats.timeElapsed.toFixed(1)}s`} label={t("typing.timeLabel")} />
         </div>
         {saved && <div className="mt-5 grid w-full max-w-md grid-cols-2 gap-3"><LiveMetric value={saved.overallAverageWpm} label={`Overall average · ${saved.overallTestsCount} tests`} /><LiveMetric value={saved.languageAverageWpm} label={`${props.language.toUpperCase()} average · ${saved.languageTestsCount} tests`} /></div>}
-        {saved && props.speedStandard && <SpeedStandardCard grade={props.speedStandard.grade} bestWpm={Math.max(props.speedStandard.bestWpm, saved.wpm)} compact className="mt-5" />}
-        <p className={clsx("mt-5 text-xs", saved ? "text-emerald-400" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
+        {saved && props.speedStandard && <SpeedStandardCard grade={props.speedStandard.grade} bestWpm={saved.isRanked ? Math.max(props.speedStandard.bestWpm, saved.wpm) : props.speedStandard.bestWpm} compact className="mt-5" />}
+        <p className={clsx("mt-5 text-xs", saved?.isRanked ? "text-emerald-400" : saved ? "text-amber-300" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : saved.reviewReasons?.includes("accuracy_too_low") ? t("typing.lowAccuracyNotRanked") : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
         {saveError && <button className="mt-3 text-xs font-medium text-nova-accent hover:text-nova-text" onClick={retrySave}>{t("typing.retrySave")}</button>}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button onClick={props.restart} className="nova-button"><RotateCcw size={16} /> {t("typing.tryAgain")}</button>

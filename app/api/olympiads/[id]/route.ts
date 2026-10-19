@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { calculateTypingStats } from "@/lib/typing";
+import { calculateTypingStats, MINIMUM_RANKED_ACCURACY } from "@/lib/typing";
 
 type CompetitionPhase = "WAITING" | "COUNTDOWN" | "ATTEMPT_1" | "BREAK" | "ATTEMPT_2" | "FINISHED";
 
@@ -232,8 +232,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const duration = Math.max(1, Math.min(olympiad.durationSeconds, (Math.min(now.getTime(), officialEnd) - officialStart) / 1_000));
     const stats = calculateTypingStats({ expectedText, typedText, durationSeconds: duration, countMissed: true, focusLostCount });
-    const needsReview = pasteDetected || focusLostCount > 3 || stats.wpm > 220 || stats.rawWpm > 260;
-    const isBetter = participant.wpm === null || stats.wpm > participant.wpm || (stats.wpm === participant.wpm && stats.accuracy > (participant.accuracy ?? 0));
+    const eligibleForRanking = stats.accuracy >= MINIMUM_RANKED_ACCURACY;
+    const currentResultIsEligible = participant.wpm !== null && (participant.accuracy ?? 0) >= MINIMUM_RANKED_ACCURACY;
+    const needsReview = pasteDetected || focusLostCount > 3 || stats.wpm > 220 || stats.rawWpm > 260 || !eligibleForRanking;
+    const isBetter = eligibleForRanking && (!currentResultIsEligible || stats.wpm > (participant.wpm ?? 0) || (stats.wpm === participant.wpm && stats.accuracy > (participant.accuracy ?? 0)));
 
     await prisma.$transaction([
       prisma.olympiadAttempt.create({
@@ -269,8 +271,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             missedChars: stats.missedChars,
             focusLostCount,
             pasteDetected,
-            needsReview,
           } : {}),
+          needsReview: participant.needsReview || needsReview,
         },
       }),
     ]);

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSuperAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { adminActivity } from "@/lib/activity";
+import { MINIMUM_RANKED_ACCURACY } from "@/lib/typing";
 
 export async function reviewResult(formData: FormData) {
   const session = await requireSuperAdmin();
@@ -14,6 +15,7 @@ export async function reviewResult(formData: FormData) {
   if (!id || !["approved", "rejected"].includes(decision)) return;
   const result = await prisma.testResult.findUnique({ where: { id }, include: { user: true } });
   if (!result) return;
+  if (decision === "approved" && result.accuracy < MINIMUM_RANKED_ACCURACY) return;
 
   const reason = resultReasons[requestedReason] ?? resultReasons.manual_review;
   const action = getAction(result.isRanked, result.reviewStatus, decision);
