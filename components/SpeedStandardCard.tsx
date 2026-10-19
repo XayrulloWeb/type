@@ -5,24 +5,24 @@ import clsx from "clsx";
 import { useI18n } from "@/components/LocaleProvider";
 import { getSpeedStandard } from "@/lib/speed-standard";
 
-export function SpeedStandardCard({ grade, averageWpm, compact = false, className }: { grade: number; averageWpm: number; compact?: boolean; className?: string }) {
+export function SpeedStandardCard({ grade, bestWpm, compact = false, className }: { grade: number; bestWpm: number; compact?: boolean; className?: string }) {
   const { t } = useI18n();
   const standard = getSpeedStandard(grade);
-  const progress = Math.min(100, Math.max(0, (averageWpm / standard.excellent) * 100));
-  const level = averageWpm === 0
+  const progress = Math.min(100, Math.max(0, (bestWpm / standard.excellent) * 100));
+  const level = bestWpm === 0
     ? { label: t("speedStandard.noResults"), tone: "text-nova-muted border-white/[0.08] bg-white/[0.03]" }
-    : averageWpm < standard.minimum
+    : bestWpm < standard.minimum
       ? { label: t("speedStandard.belowMinimum"), tone: "text-nova-error border-nova-error/20 bg-nova-error/[0.06]" }
-      : averageWpm < standard.average
+      : bestWpm < standard.average
         ? { label: t("speedStandard.minimumLevel"), tone: "text-amber-300 border-amber-300/20 bg-amber-300/[0.06]" }
-      : averageWpm < standard.excellent
+        : bestWpm < standard.excellent
           ? { label: t("speedStandard.averageLevel"), tone: "text-sky-300 border-sky-300/20 bg-sky-300/[0.06]" }
           : { label: t("speedStandard.excellentLevel"), tone: "text-emerald-300 border-emerald-300/20 bg-emerald-300/[0.06]" };
-  const next = averageWpm < standard.minimum
+  const next = bestWpm < standard.minimum
     ? { value: standard.minimum, label: t("speedStandard.minimum") }
-    : averageWpm < standard.average
+    : bestWpm < standard.average
       ? { value: standard.average, label: t("speedStandard.average") }
-      : averageWpm < standard.excellent
+      : bestWpm < standard.excellent
         ? { value: standard.excellent, label: t("speedStandard.excellent") }
         : null;
 
@@ -37,8 +37,8 @@ export function SpeedStandardCard({ grade, averageWpm, compact = false, classNam
           </div>
         </div>
         <div className="flex items-center gap-2 sm:justify-end">
-          <span className="text-2xl font-semibold text-nova-text">{averageWpm || "—"}</span>
-          <span className="text-[9px] uppercase tracking-[0.14em] text-nova-muted">{t("speedStandard.averageWpm")}</span>
+          <span className="text-2xl font-semibold text-nova-text">{bestWpm || "—"}</span>
+          <span className="text-[9px] uppercase tracking-[0.14em] text-nova-muted">{t("speedStandard.bestWpm")}</span>
           <span className={clsx("ml-2 rounded-full border px-2.5 py-1 text-[10px] font-semibold", level.tone)}>{level.label}</span>
         </div>
       </div>
@@ -55,7 +55,7 @@ export function SpeedStandardCard({ grade, averageWpm, compact = false, classNam
         </div>
       </div>
 
-      {!compact && <div className="mt-4 flex items-center gap-2 text-xs text-nova-muted"><Target size={14} className="text-nova-accent" />{next ? <>{t("speedStandard.nextLevel")} <b className="text-nova-text">{next.label} · +{next.value - averageWpm} WPM</b></> : <b className="text-emerald-300">{t("speedStandard.excellentReached")}</b>}</div>}
+      {!compact && <div className="mt-4 flex items-center gap-2 text-xs text-nova-muted"><Target size={14} className="text-nova-accent" />{next ? <>{t("speedStandard.nextLevel")} <b className="text-nova-text">{next.label} · +{next.value - bestWpm} WPM</b></> : <b className="text-emerald-300">{t("speedStandard.excellentReached")}</b>}</div>}
     </section>
   );
 }
