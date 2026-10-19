@@ -13,3 +13,19 @@ export function getSpeedStandard(grade: number): SpeedStandard {
     excellent: Math.round(average * 1.4),
   };
 }
+
+export function getSpeedStandardProgress(wpm: number, standard: SpeedStandard): number {
+  const value = Math.max(0, wpm);
+  const stage = 100 / 3;
+
+  if (value < standard.minimum) {
+    return (value / standard.minimum) * stage;
+  }
+  if (value < standard.average) {
+    return stage + ((value - standard.minimum) / (standard.average - standard.minimum)) * stage;
+  }
+  if (value < standard.excellent) {
+    return stage * 2 + ((value - standard.average) / (standard.excellent - standard.average)) * stage;
+  }
+  return 100;
+}
