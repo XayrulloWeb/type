@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, Expand, Keyboard, RotateCcw, Volume2, VolumeX 
 import clsx from "clsx";
 import { Header } from "@/components/Header";
 import { TypingArea } from "@/components/typing/TypingArea";
+import { CapsLockWarning } from "@/components/typing/CapsLockWarning";
 import { useTypingEngine, type TypingMode } from "@/hooks/useTypingEngine";
 import type { TypingStats } from "@/lib/typing";
 import type { TestChallenge } from "@/lib/test-challenge";
@@ -299,6 +300,7 @@ function TypingSession(props: {
     <>
       {status === "idle" && props.controls}
       <section className="flex w-full flex-1 flex-col items-center">
+        <CapsLockWarning />
         <TypingArea expectedText={props.expectedText} typedText={typed} status={status} />
         <div className="mt-14 text-center sm:mt-18">
           <div className="font-mono text-5xl font-medium tracking-[-0.05em] text-nova-text">{props.mode === "time" ? timeLeft : Math.max(0, props.wordCount - typed.trim().split(/\s+/).filter(Boolean).length)}</div>

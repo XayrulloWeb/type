@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Clock3, Medal, ShieldCheck, Trophy, Users } from "lucide-react";
 import { TypingArea } from "@/components/typing/TypingArea";
+import { CapsLockWarning } from "@/components/typing/CapsLockWarning";
 import { calculateTypingStats } from "@/lib/typing";
 import { normalizeTypingKey, normalizeTypingText, typingCharacters } from "@/lib/typing-text";
 
@@ -134,6 +135,7 @@ export function OlympiadRoom({ olympiadId, currentUserId }: { olympiadId: string
 
   if (active && competitionText) return <div className="mx-auto w-full max-w-[1120px] px-5 pb-12 pt-8 sm:px-8">
     <div className="mb-12 flex items-center justify-between"><div><div className="text-xs uppercase tracking-[0.18em] text-nova-accent">Олимпиада · {room.language.toUpperCase()} · Попытка {activeAttempt} из {room.attemptLimit}</div><h1 className="mt-2 text-xl font-semibold">{room.title}</h1></div><div className="text-right"><div className="font-mono text-3xl font-semibold text-nova-accent">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}</div><div className="text-[10px] uppercase tracking-wider text-nova-muted">осталось</div></div></div>
+    <CapsLockWarning />
     <TypingArea expectedText={competitionText} typedText={typed} status="running" />
     <div className="mt-12 grid grid-cols-3 gap-3"><Metric value={liveStats.wpm} label="WPM" /><Metric value={`${liveStats.accuracy.toFixed(0)}%`} label="Точность" /><Metric value={liveStats.incorrectChars + liveStats.extraChars} label="Ошибки" /></div>
     <div className="mt-6 flex items-center justify-center gap-2 text-xs text-nova-muted"><ShieldCheck size={14} /> Вставка текста заблокирована, уход со страницы фиксируется.</div>
