@@ -42,7 +42,7 @@ function analyzeHistoricalResult(result, history) {
     riskScore += 3;
   }
 
-  if (recent.length >= 3 && difference > 0 && result.wpm - baselineWpm >= 15 && result.wpm >= baselineWpm * 1.6) {
+  if (recent.length >= 3 && difference >= 10 && result.wpm - baselineWpm >= 15 && result.wpm >= baselineWpm * 1.6) {
     reasons.push("recent_median_spike");
     riskScore += 3;
   }
