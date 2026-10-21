@@ -78,6 +78,7 @@ model TestResult {
   assignmentResults AssignmentResult[]
 
   @@index([userId, isRanked, wpm])
+  @@index([userId, createdAt])
   @@index([isRanked, createdAt])
   @@index([reviewStatus])
   @@index([riskScore, createdAt])

@@ -33,7 +33,8 @@ function periodStart(period: Period) {
 
 export async function getStudentRankings(period: Period, classId?: string, language: LanguageFilter = "all") {
   const createdAt = periodStart(period);
-  const results = await prisma.testResult.findMany({
+  const groups = await prisma.testResult.groupBy({
+    by: ["userId"],
     where: {
       isRanked: true,
       ...(createdAt ? { createdAt: { gte: createdAt } } : {}),
@@ -42,46 +43,31 @@ export async function getStudentRankings(period: Period, classId?: string, langu
         ? { user: { classId, role: "STUDENT", isActive: true, archivedAt: null } }
         : { user: { role: "STUDENT", isActive: true, archivedAt: null } }),
     },
-    include: { user: { include: { class: true } } },
-    orderBy: { createdAt: "desc" },
+    _avg: { wpm: true, accuracy: true },
+    _max: { wpm: true, createdAt: true },
+    _count: { _all: true },
   });
+  if (!groups.length) return [];
+  const users = await prisma.user.findMany({
+    where: { id: { in: groups.map((item) => item.userId) } },
+    include: { class: true },
+  });
+  const usersById = new Map(users.map((user) => [user.id, user]));
 
-  const grouped = new Map<string, {
-    user: StudentRanking["user"];
-    totalWpm: number;
-    bestWpm: number;
-    totalAccuracy: number;
-    testsCount: number;
-    lastActiveAt: Date;
-  }>();
-
-  for (const result of results) {
-    const item = grouped.get(result.userId) ?? {
-      user: result.user,
-      totalWpm: 0,
-      bestWpm: 0,
-      totalAccuracy: 0,
-      testsCount: 0,
-      lastActiveAt: result.createdAt,
-    };
-    item.totalWpm += result.wpm;
-    item.bestWpm = Math.max(item.bestWpm, result.wpm);
-    item.totalAccuracy += result.accuracy;
-    item.testsCount += 1;
-    if (result.createdAt > item.lastActiveAt) item.lastActiveAt = result.createdAt;
-    grouped.set(result.userId, item);
-  }
-
-  return [...grouped.entries()]
-    .map(([userId, item]): StudentRanking => ({
-      userId,
-      user: item.user,
-      averageWpm: Math.round(item.totalWpm / item.testsCount),
-      bestWpm: item.bestWpm,
-      averageAccuracy: item.totalAccuracy / item.testsCount,
-      testsCount: item.testsCount,
-      lastActiveAt: item.lastActiveAt,
-    }))
+  return groups
+    .flatMap((item): StudentRanking[] => {
+      const user = usersById.get(item.userId);
+      if (!user || item._max.createdAt === null) return [];
+      return [{
+        userId: item.userId,
+        user,
+        averageWpm: Math.round(item._avg.wpm ?? 0),
+        bestWpm: item._max.wpm ?? 0,
+        averageAccuracy: item._avg.accuracy ?? 0,
+        testsCount: item._count._all,
+        lastActiveAt: item._max.createdAt,
+      }];
+    })
     .sort((a, b) => b.bestWpm - a.bestWpm || b.averageAccuracy - a.averageAccuracy || b.averageWpm - a.averageWpm);
 }
 
