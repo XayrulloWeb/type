@@ -55,7 +55,7 @@ export function analyzeTestRisk(input: {
     riskScore += 3;
   }
 
-  if (baselineWpm !== null && recent.length >= 3 && input.stats.wpm - baselineWpm >= 15 && input.stats.wpm >= baselineWpm * 1.6) {
+  if (baselineWpm !== null && recent.length >= 3 && bestDifference > 0 && input.stats.wpm - baselineWpm >= 15 && input.stats.wpm >= baselineWpm * 1.6) {
     addReason(reasons, "recent_median_spike");
     riskScore += 3;
   }

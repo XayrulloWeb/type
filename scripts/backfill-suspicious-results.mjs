@@ -42,7 +42,7 @@ function analyzeHistoricalResult(result, history) {
     riskScore += 3;
   }
 
-  if (recent.length >= 3 && result.wpm - baselineWpm >= 15 && result.wpm >= baselineWpm * 1.6) {
+  if (recent.length >= 3 && difference > 0 && result.wpm - baselineWpm >= 15 && result.wpm >= baselineWpm * 1.6) {
     reasons.push("recent_median_spike");
     riskScore += 3;
   }
@@ -95,11 +95,10 @@ async function main() {
         continue;
       }
       const risk = analyzeHistoricalResult(result, acceptedHistory);
-      if (!risk) {
-        acceptedHistory.push(result);
-        continue;
-      }
-      candidates.push({ user, result, risk });
+      if (risk) candidates.push({ user, result, risk });
+      // Historical backfill uses every previously ranked result as context so one
+      // suspicious record cannot cause a cascade of false positives after it.
+      acceptedHistory.push(result);
     }
   }
 
