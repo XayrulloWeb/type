@@ -15,6 +15,7 @@ export NODE_OPTIONS=--max-old-space-size=768
 export TZ="${TZ:-Asia/Tashkent}"
 
 cd "$source_dir"
+npx prisma generate
 npm run build
 "$app_root/shared/backup-db.sh"
 npx prisma migrate deploy
