@@ -11,6 +11,7 @@ export interface AdminNavItem {
   href: string;
   label: string;
   icon: keyof typeof icons;
+  badge?: number;
 }
 
 export function AdminNavigation({ items }: { items: AdminNavItem[] }) {
@@ -23,6 +24,7 @@ export function AdminNavigation({ items }: { items: AdminNavItem[] }) {
         {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-nova-accent shadow-[0_0_10px_rgba(227,182,75,0.55)]" />}
         <Icon size={16} className="transition-transform group-hover:scale-105" />
         <span>{item.label}</span>
+        {Boolean(item.badge) && <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-nova-error px-1.5 py-0.5 text-[9px] font-bold text-white">{item.badge}</span>}
       </Link>;
     })}
   </nav>;

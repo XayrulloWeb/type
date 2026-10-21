@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { calculateTypingStats, type TypingStats } from "@/lib/typing";
+import { calculateTypingStats, type TypingStats, type TypingTelemetry } from "@/lib/typing";
 import { normalizeTypingKey, typingCharacters } from "@/lib/typing-text";
 
 export type TypingStatus = "idle" | "running" | "finished";
@@ -11,7 +11,7 @@ interface TypingEngineOptions {
   expectedText: string;
   mode: TypingMode;
   durationLimit?: number;
-  onFinish?: (stats: TypingStats & { pasteDetected: boolean; typedText: string }) => void;
+  onFinish?: (stats: TypingStats & { pasteDetected: boolean; typedText: string; telemetry: TypingTelemetry }) => void;
 }
 
 export function useTypingEngine({
@@ -31,6 +31,8 @@ export function useTypingEngine({
   const endTimeRef = useRef<number | null>(null);
   const finishedRef = useRef(false);
   const submittedRef = useRef(false);
+  const keystrokeTimesRef = useRef<number[]>([]);
+  const backspaceCountRef = useRef(0);
   const onFinishRef = useRef(onFinish);
   const expectedLength = useMemo(() => typingCharacters(expectedText).length, [expectedText]);
 
@@ -82,7 +84,7 @@ export function useTypingEngine({
   useEffect(() => {
     if (status !== "finished" || submittedRef.current) return;
     submittedRef.current = true;
-    onFinishRef.current?.({ ...stats, pasteDetected, typedText: typed });
+    onFinishRef.current?.({ ...stats, pasteDetected, typedText: typed, telemetry: buildTelemetry(keystrokeTimesRef.current, backspaceCountRef.current) });
   }, [pasteDetected, stats, status, typed]);
 
   useEffect(() => {
@@ -106,6 +108,8 @@ export function useTypingEngine({
 
       if (event.key === "Backspace") {
         event.preventDefault();
+        keystrokeTimesRef.current.push(performance.now());
+        backspaceCountRef.current += 1;
         setTyped((current) => typingCharacters(current).slice(0, -1).join(""));
         return;
       }
@@ -115,6 +119,7 @@ export function useTypingEngine({
       if (!input) return;
 
       event.preventDefault();
+      keystrokeTimesRef.current.push(performance.now());
       if (status === "idle") {
         startTimeRef.current = Date.now();
         setStatus("running");
@@ -158,6 +163,8 @@ export function useTypingEngine({
     submittedRef.current = false;
     startTimeRef.current = null;
     endTimeRef.current = null;
+    keystrokeTimesRef.current = [];
+    backspaceCountRef.current = 0;
     setTyped("");
     setStatus("idle");
     setTimeLeft(durationLimit);
@@ -167,4 +174,24 @@ export function useTypingEngine({
   }, [durationLimit]);
 
   return { typed, status, timeLeft, stats, reset, pasteDetected };
+}
+
+function buildTelemetry(timestamps: number[], backspaceCount: number): TypingTelemetry {
+  if (!timestamps.length) return { keystrokeCount: 0, backspaceCount, maxBurstCps: 0, timingVariation: null };
+  let start = 0;
+  let maxBurstCps = 1;
+  for (let end = 0; end < timestamps.length; end += 1) {
+    while (timestamps[end] - timestamps[start] > 1_000) start += 1;
+    maxBurstCps = Math.max(maxBurstCps, end - start + 1);
+  }
+  const intervals = timestamps.slice(1).map((value, index) => value - timestamps[index]).filter((value) => value > 0 && value < 5_000);
+  if (!intervals.length) return { keystrokeCount: timestamps.length, backspaceCount, maxBurstCps, timingVariation: null };
+  const mean = intervals.reduce((sum, value) => sum + value, 0) / intervals.length;
+  const variance = intervals.reduce((sum, value) => sum + (value - mean) ** 2, 0) / intervals.length;
+  return {
+    keystrokeCount: timestamps.length,
+    backspaceCount,
+    maxBurstCps,
+    timingVariation: mean > 0 ? Math.sqrt(variance) / mean : null,
+  };
 }

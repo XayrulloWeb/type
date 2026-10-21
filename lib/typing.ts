@@ -14,6 +14,13 @@ export interface TypingStats {
   focusLostCount: number;
 }
 
+export interface TypingTelemetry {
+  keystrokeCount: number;
+  backspaceCount: number;
+  maxBurstCps: number;
+  timingVariation: number | null;
+}
+
 interface CalculateTypingStatsInput {
   expectedText: string;
   typedText: string;

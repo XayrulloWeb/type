@@ -9,7 +9,7 @@ import { Header } from "@/components/Header";
 import { TypingArea } from "@/components/typing/TypingArea";
 import { CapsLockWarning } from "@/components/typing/CapsLockWarning";
 import { useTypingEngine, type TypingMode } from "@/hooks/useTypingEngine";
-import type { TypingStats } from "@/lib/typing";
+import type { TypingStats, TypingTelemetry } from "@/lib/typing";
 import type { TestChallenge } from "@/lib/test-challenge";
 import { useI18n } from "@/components/LocaleProvider";
 import { SpeedStandardCard } from "@/components/SpeedStandardCard";
@@ -19,6 +19,8 @@ type Language = "en" | "ru";
 interface SavedResult {
   id: string;
   isRanked: boolean;
+  reviewStatus: string | null;
+  riskScore: number;
   wpm: number;
   newPersonalBest: boolean;
   overallAverageWpm: number;
@@ -208,9 +210,9 @@ function TypingSession(props: {
   const [saved, setSaved] = useState<SavedResult | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const lastResultRef = useRef<(TypingStats & { pasteDetected: boolean; typedText: string }) | null>(null);
+  const lastResultRef = useRef<(TypingStats & { pasteDetected: boolean; typedText: string; telemetry: TypingTelemetry }) | null>(null);
 
-  const persistResult = useCallback(async (finalStats: TypingStats & { pasteDetected: boolean; typedText: string }) => {
+  const persistResult = useCallback(async (finalStats: TypingStats & { pasteDetected: boolean; typedText: string; telemetry: TypingTelemetry }) => {
     setSaving(true);
     setSaveError(false);
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -232,6 +234,7 @@ function TypingSession(props: {
             duration: finalStats.timeElapsed,
             focusLostCount: finalStats.focusLostCount,
             pasteDetected: finalStats.pasteDetected,
+            telemetry: finalStats.telemetry,
           }),
         });
         if (!response.ok) throw new Error("save_failed");
@@ -246,7 +249,7 @@ function TypingSession(props: {
     setSaveError(true);
   }, [props.assignmentId, props.challengeToken, props.clientAttemptId, props.duration, props.expectedText, props.language, props.mode, props.textId, props.wordCount]);
 
-  const saveResult = useCallback((finalStats: TypingStats & { pasteDetected: boolean; typedText: string }) => {
+  const saveResult = useCallback((finalStats: TypingStats & { pasteDetected: boolean; typedText: string; telemetry: TypingTelemetry }) => {
     lastResultRef.current = finalStats;
     void persistResult(finalStats);
   }, [persistResult]);
@@ -286,7 +289,7 @@ function TypingSession(props: {
         </div>
         {saved && <div className="mt-5 grid w-full max-w-md grid-cols-2 gap-3"><LiveMetric value={saved.overallAverageWpm} label={`Overall average · ${saved.overallTestsCount} tests`} /><LiveMetric value={saved.languageAverageWpm} label={`${props.language.toUpperCase()} average · ${saved.languageTestsCount} tests`} /></div>}
         {saved && props.speedStandard && <SpeedStandardCard grade={props.speedStandard.grade} bestWpm={saved.isRanked ? Math.max(props.speedStandard.bestWpm, saved.wpm) : props.speedStandard.bestWpm} compact className="mt-5" />}
-        <p className={clsx("mt-5 text-xs", saved?.isRanked ? "text-emerald-400" : saved ? "text-amber-300" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : saved.reviewReasons?.includes("accuracy_too_low") ? t("typing.lowAccuracyNotRanked") : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
+        <p className={clsx("mt-5 text-xs", saved?.isRanked ? "text-emerald-400" : saved ? "text-amber-300" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : saved.reviewStatus === "pending" ? t("typing.savedPendingReview") : saved.reviewReasons?.includes("accuracy_too_low") ? t("typing.lowAccuracyNotRanked") : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
         {saveError && <button className="mt-3 text-xs font-medium text-nova-accent hover:text-nova-text" onClick={retrySave}>{t("typing.retrySave")}</button>}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button onClick={props.restart} className="nova-button"><RotateCcw size={16} /> {t("typing.tryAgain")}</button>

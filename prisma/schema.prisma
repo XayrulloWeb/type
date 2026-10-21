@@ -62,8 +62,17 @@ model TestResult {
   extraChars      Int
   missedChars     Int
   focusLostCount  Int      @default(0)
+  pasteDetected   Boolean  @default(false)
+  keystrokeCount  Int      @default(0)
+  backspaceCount  Int      @default(0)
+  maxBurstCps     Float?
+  timingVariation Float?
   isRanked        Boolean  @default(true)
   reviewStatus    String? // "pending", "approved", "rejected"
+  reviewReasons   Json?
+  riskScore       Int      @default(0)
+  baselineWpm     Int?
+  previousBestWpm Int?
   createdAt       DateTime @default(now())
 
   assignmentResults AssignmentResult[]
@@ -71,6 +80,7 @@ model TestResult {
   @@index([userId, isRanked, wpm])
   @@index([isRanked, createdAt])
   @@index([reviewStatus])
+  @@index([riskScore, createdAt])
 }
 
 model Text {

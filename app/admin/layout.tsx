@@ -5,10 +5,14 @@ import { SignOutButton } from "@/components/SignOutButton";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { getI18n } from "@/lib/i18n";
 import { AdminNavigation } from "@/components/admin/AdminNavigation";
+import { prisma } from "@/lib/db";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireSuperAdminPage();
-  const { t } = await getI18n();
+  const [{ t }, pendingReviews] = await Promise.all([
+    getI18n(),
+    prisma.testResult.count({ where: { reviewStatus: "pending", language: { in: ["ru", "en"] } } }),
+  ]);
   const nav = [
     { href: "/admin", label: t("admin.overview"), icon: "gauge" as const },
     { href: "/admin/ranking", label: "Рейтинг", icon: "ranking" as const },
@@ -17,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/texts", label: t("admin.texts"), icon: "texts" as const },
     { href: "/admin/assignments", label: t("admin.assignments"), icon: "assignments" as const },
     { href: "/admin/olympiads", label: "Олимпиады", icon: "olympiads" as const },
-    { href: "/admin/review", label: t("admin.review"), icon: "review" as const },
+    { href: "/admin/review", label: t("admin.review"), icon: "review" as const, badge: pendingReviews },
     { href: "/admin/activity", label: t("admin.activity"), icon: "activity" as const },
   ];
   return <div className="min-h-screen lg:flex">
