@@ -17,5 +17,5 @@ export default async function TypingPage() {
   const speedStandard = student.role === "STUDENT" && student.class
     ? { grade: student.class.grade, bestWpm: speed._max.wpm ?? 0 }
     : undefined;
-  return <TypingPractice user={session.user} initialChallenge={initialChallenge} practiceOnly={student.role === "SUPER_ADMIN"} speedStandard={speedStandard} />;
+  return <TypingPractice user={session.user} initialChallenge={initialChallenge} adminMode={student.role === "SUPER_ADMIN"} speedStandard={speedStandard} />;
 }

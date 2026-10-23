@@ -45,7 +45,7 @@ interface LibraryPractice {
   language: Language;
 }
 
-export function TypingPractice({ user, assignment, libraryText, initialChallenge, practiceOnly = false, speedStandard }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; practiceOnly?: boolean; speedStandard?: { grade: number; bestWpm: number } }) {
+export function TypingPractice({ user, assignment, libraryText, initialChallenge, adminMode = false, speedStandard }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; adminMode?: boolean; speedStandard?: { grade: number; bestWpm: number } }) {
   const fixedText = assignment ?? libraryText;
   const { t } = useI18n();
   const [mode, setMode] = useState<TypingMode>(initialChallenge.mode);
@@ -131,7 +131,7 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
           clientAttemptId={challenge.clientAttemptId}
           assignmentId={assignment?.id}
           textId={libraryText?.id}
-          practiceOnly={practiceOnly}
+          adminMode={adminMode}
           speedStandard={speedStandard}
           restart={restart}
           controls={
@@ -201,7 +201,7 @@ function TypingSession(props: {
   clientAttemptId: string;
   assignmentId?: string;
   textId?: string;
-  practiceOnly: boolean;
+  adminMode: boolean;
   speedStandard?: { grade: number; bestWpm: number };
   restart: () => void;
   controls: React.ReactNode;
@@ -262,7 +262,7 @@ function TypingSession(props: {
     expectedText: props.expectedText,
     mode: props.mode,
     durationLimit: props.duration,
-    onFinish: props.practiceOnly ? undefined : saveResult,
+    onFinish: saveResult,
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -289,7 +289,7 @@ function TypingSession(props: {
         </div>
         {saved && <div className="mt-5 grid w-full max-w-md grid-cols-2 gap-3"><LiveMetric value={saved.overallAverageWpm} label={`Overall average · ${saved.overallTestsCount} tests`} /><LiveMetric value={saved.languageAverageWpm} label={`${props.language.toUpperCase()} average · ${saved.languageTestsCount} tests`} /></div>}
         {saved && props.speedStandard && <SpeedStandardCard grade={props.speedStandard.grade} bestWpm={saved.isRanked ? Math.max(props.speedStandard.bestWpm, saved.wpm) : props.speedStandard.bestWpm} compact className="mt-5" />}
-        <p className={clsx("mt-5 text-xs", saved?.isRanked ? "text-emerald-400" : saved ? "text-amber-300" : saveError ? "text-nova-error" : "text-nova-muted")}>{props.practiceOnly ? "Режим администратора: результат не сохраняется." : saved ? (props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : saved.reviewStatus === "pending" ? t("typing.savedPendingReview") : saved.reviewReasons?.includes("accuracy_too_low") ? t("typing.lowAccuracyNotRanked") : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
+        <p className={clsx("mt-5 text-xs", saved?.isRanked ? "text-emerald-400" : saved ? "text-amber-300" : saveError ? "text-nova-error" : "text-nova-muted")}>{saved ? (props.adminMode ? t("typing.savedAdmin") : props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : saved.reviewStatus === "pending" ? t("typing.savedPendingReview") : saved.reviewReasons?.includes("accuracy_too_low") ? t("typing.lowAccuracyNotRanked") : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
         {saveError && <button className="mt-3 text-xs font-medium text-nova-accent hover:text-nova-text" onClick={retrySave}>{t("typing.retrySave")}</button>}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button onClick={props.restart} className="nova-button"><RotateCcw size={16} /> {t("typing.tryAgain")}</button>

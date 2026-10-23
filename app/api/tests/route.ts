@@ -18,9 +18,10 @@ export async function POST(request: Request) {
     }
 
     const activeUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, isActive: true, archivedAt: true, classId: true, class: { select: { grade: true } } } });
-    if (!activeUser?.isActive || activeUser.archivedAt || activeUser.role !== "STUDENT") {
+    if (!activeUser?.isActive || activeUser.archivedAt || !["STUDENT", "SUPER_ADMIN"].includes(activeUser.role)) {
       return NextResponse.json({ error: "Account is not active." }, { status: 403 });
     }
+    const isAdminResult = activeUser.role === "SUPER_ADMIN";
 
     const body = (await request.json()) as Record<string, unknown>;
     const clientAttemptId = typeof body.clientAttemptId === "string" ? body.clientAttemptId : "";
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
       where: { id: assignmentId },
       include: { text: true },
     }) : null;
-    if (assignmentId && (
+    if (assignmentId && (isAdminResult ||
       !assignment?.isActive || assignment.classId !== activeUser.classId || mode !== "text" ||
       language !== assignment.text.language || expectedText !== prepareTypingText(assignment.text.content)
     )) {
@@ -123,16 +124,26 @@ export async function POST(request: Request) {
       take: 30,
       select: { wpm: true, accuracy: true, duration: true, mode: true, language: true },
     });
-    const risk = analyzeTestRisk({
-      stats,
-      telemetry,
-      mode: mode as "time" | "words" | "text",
-      language,
-      selectedDuration,
-      pasteDetected,
-      grade: activeUser.class?.grade ?? null,
-      previousResults,
-    });
+    const adminPreviousBestWpm = previousResults.length ? Math.max(...previousResults.map((item) => item.wpm)) : null;
+    const risk = isAdminResult
+      ? {
+          isRanked: true,
+          reviewStatus: null,
+          reasons: [] as string[],
+          riskScore: 0,
+          baselineWpm: null,
+          previousBestWpm: adminPreviousBestWpm,
+        }
+      : analyzeTestRisk({
+          stats,
+          telemetry,
+          mode: mode as "time" | "words" | "text",
+          language,
+          selectedDuration,
+          pasteDetected,
+          grade: activeUser.class?.grade ?? null,
+          previousResults,
+        });
 
     let assignmentCompleted = false;
     const result = await prisma.$transaction(async (transaction) => {

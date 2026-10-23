@@ -16,6 +16,7 @@
     "start": "next start",
     "start:production": "node scripts/check-production-env.mjs && next start",
     "lint": "eslint",
+    "admin:create": "node scripts/create-super-admin.mjs",
     "db:seed-texts": "node prisma/seed-texts.js",
     "postinstall": "prisma skills sync || exit 0"
   },

@@ -13,6 +13,7 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const result = await prisma.testResult.findUnique({ where: { id }, include: { user: true } });
   if (!result || !["ru", "en"].includes(result.language) || (result.userId !== session.user.id && session.user.role !== "SUPER_ADMIN")) notFound();
+  const adminResult = result.user.role === "SUPER_ADMIN";
   const previousBetter = result.isRanked ? await prisma.testResult.count({ where: { userId: result.userId, isRanked: true, language: { in: ["ru", "en"] }, createdAt: { lt: result.createdAt }, wpm: { gte: result.wpm } } }) : 1;
   const { t } = await getI18n();
 
@@ -21,8 +22,8 @@ export default async function ResultPage({ params }: { params: Promise<{ id: str
     <div className="bg-gradient-to-b from-[#f3ce72] to-nova-accent bg-clip-text text-[clamp(5rem,14vw,9rem)] font-semibold leading-none tracking-[-0.065em] text-transparent drop-shadow-[0_16px_40px_rgba(227,182,75,0.18)]">{result.wpm}</div><div className="mt-2 text-sm uppercase tracking-[0.25em] text-nova-muted">{t("typing.wpm")}</div>
     <div className="mt-10 grid w-full grid-cols-2 gap-3 sm:grid-cols-4"><Metric value={`${result.accuracy.toFixed(0)}%`} label={t("typing.accuracy")} /><Metric value={result.rawWpm} label={t("typing.rawWpm")} /><Metric value={result.incorrectChars + result.extraChars} label={t("typing.errors")} error /><Metric value={`${result.duration}s`} label={t("typing.timeLabel")} /></div>
     <div className="data-card mt-5 grid w-full grid-cols-2 gap-px overflow-hidden bg-white/[0.06] text-left sm:grid-cols-4"><Small value={`${result.correctChars} / ${result.incorrectChars} / ${result.extraChars} / ${result.missedChars}`} label={t("result.characters")} wide /><Small value={result.language.toUpperCase()} label={t("common.language")} /><Small value={t(`typing.${result.mode}`)} label={t("result.mode")} /></div>
-    <div className={`mt-5 rounded-full px-4 py-2 text-xs ${result.isRanked ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-nova-muted"}`}>{result.isRanked ? t("result.ranked") : t("result.notRanked")}</div>
-    <div className="mt-9 flex gap-3"><Link className="nova-button" href="/typing"><RotateCcw size={16} /> {t("typing.tryAgain")}</Link><Link className="nova-button-secondary" href="/leaderboard/class">{t("leaderboard.title")}</Link></div>
+    <div className={`mt-5 rounded-full px-4 py-2 text-xs ${result.isRanked ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-nova-muted"}`}>{adminResult ? t("result.adminPersonal") : result.isRanked ? t("result.ranked") : t("result.notRanked")}</div>
+    <div className="mt-9 flex gap-3"><Link className="nova-button" href="/typing"><RotateCcw size={16} /> {t("typing.tryAgain")}</Link><Link className="nova-button-secondary" href={adminResult ? "/history" : "/leaderboard/class"}>{adminResult ? t("nav.history") : t("leaderboard.title")}</Link></div>
   </main></div>;
 }
 
