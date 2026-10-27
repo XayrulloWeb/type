@@ -19,6 +19,7 @@ export interface TestRiskAnalysis {
 }
 
 const automaticRejectionReasons = new Set([
+  "no_input",
   "accuracy_too_low",
   "paste_attempt",
   "duration_too_short",
@@ -45,6 +46,9 @@ export function analyzeTestRisk(input: {
   const previousBestWpm = comparable.length ? Math.max(...comparable.map((item) => item.wpm)) : null;
   const baselineWpm = recent.length ? Math.round(median(recent.map((item) => item.wpm))) : null;
   const bestDifference = previousBestWpm === null ? 0 : input.stats.wpm - previousBestWpm;
+  const minimumCompetitiveWpm = input.grade ? getSpeedStandard(input.grade).minimum : 10;
+  const canAffectRanking = input.stats.wpm >= minimumCompetitiveWpm &&
+    (previousBestWpm === null || input.stats.wpm > previousBestWpm);
   let riskScore = technical.reasons.includes("focus_lost") ? 3 : 0;
 
   if (previousBestWpm !== null && previousBestWpm >= 10 && bestDifference >= 25) {
@@ -88,7 +92,13 @@ export function analyzeTestRisk(input: {
 
   const normalizedRisk = Math.min(10, hardRejected ? Math.max(10, riskScore) : riskScore);
   if (hardRejected) return { isRanked: false, reviewStatus: "rejected", reasons, riskScore: normalizedRisk, baselineWpm, previousBestWpm };
-  if (normalizedRisk >= 3) return { isRanked: false, reviewStatus: "pending", reasons, riskScore: normalizedRisk, baselineWpm, previousBestWpm };
+  if (normalizedRisk >= 3) {
+    if (!canAffectRanking) {
+      addReason(reasons, "noncompetitive_result");
+      return { isRanked: false, reviewStatus: "rejected", reasons, riskScore: normalizedRisk, baselineWpm, previousBestWpm };
+    }
+    return { isRanked: false, reviewStatus: "pending", reasons, riskScore: normalizedRisk, baselineWpm, previousBestWpm };
+  }
   return { isRanked: true, reviewStatus: null, reasons, riskScore: normalizedRisk, baselineWpm, previousBestWpm };
 }
 
