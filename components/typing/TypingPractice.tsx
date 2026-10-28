@@ -134,6 +134,7 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
           adminMode={adminMode}
           speedStandard={speedStandard}
           restart={restart}
+          restarting={challengeLoading}
           controls={
             <>{speedStandard && <SpeedStandardCard grade={speedStandard.grade} bestWpm={speedStandard.bestWpm} compact className="mb-4" />}{fixedText ? <div className="data-card mb-14 w-full max-w-3xl p-5 text-center sm:mb-20"><Link href={assignment ? "/assignments" : "/texts"} className="mb-2 inline-flex items-center gap-1 text-xs text-nova-muted transition hover:text-nova-text"><ArrowLeft size={13} /> {assignment ? t("typing.backAssignments") : t("typing.backTexts")}</Link><div className="text-sm font-semibold">{fixedText.title}</div><div className="mt-1 text-xs uppercase tracking-[0.14em] text-nova-accent">{t(`language.${fixedText.language}`)} · {t("typing.text")}</div></div> : <TestControls
               mode={mode}
@@ -204,6 +205,7 @@ function TypingSession(props: {
   adminMode: boolean;
   speedStandard?: { grade: number; bestWpm: number };
   restart: () => void;
+  restarting: boolean;
   controls: React.ReactNode;
 }) {
   const { t } = useI18n();
@@ -264,9 +266,10 @@ function TypingSession(props: {
     durationLimit: props.duration,
     onFinish: saveResult,
   });
+  const errorCount = stats.incorrectChars + stats.extraChars;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (status === "finished" && event.key === "Enter") {
+      if ((status === "running" || status === "finished") && event.key === "Enter" && !props.restarting) {
         event.preventDefault();
         props.restart();
       }
@@ -292,7 +295,7 @@ function TypingSession(props: {
         <p className={clsx("mt-5 text-xs", saved?.isRanked ? "text-emerald-400" : saved ? "text-amber-300" : saveError ? "text-nova-error" : "text-nova-muted")}>{saved ? (props.adminMode ? t("typing.savedAdmin") : props.assignmentId ? (saved.assignmentCompleted ? t("typing.assignmentDone") : t("typing.assignmentImprove")) : saved.isRanked ? `${t("typing.savedRanked")} · ${props.language.toUpperCase()}` : saved.reviewStatus === "pending" ? t("typing.savedPendingReview") : saved.reviewReasons?.includes("accuracy_too_low") ? t("typing.lowAccuracyNotRanked") : t("typing.savedPractice")) : saveError ? t("typing.saveFailed") : saving ? t("typing.saving") : "..."}</p>
         {saveError && <button className="mt-3 text-xs font-medium text-nova-accent hover:text-nova-text" onClick={retrySave}>{t("typing.retrySave")}</button>}
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <button onClick={props.restart} className="nova-button"><RotateCcw size={16} /> {t("typing.tryAgain")}</button>
+          <button onClick={props.restart} className="nova-button" disabled={props.restarting}><RotateCcw size={16} /> {t("typing.tryAgain")}</button>
           {props.assignmentId && <Link href="/assignments" className="nova-button-secondary">{t("typing.backAssignments")}</Link>}
           {saved && <Link href={`/results/${saved.id}`} className="nova-button-secondary">{t("typing.viewResult")}</Link>}
         </div>
@@ -313,8 +316,13 @@ function TypingSession(props: {
         <div className="mt-8 grid w-full max-w-[520px] grid-cols-3 gap-3 sm:mt-12">
           <LiveMetric value={stats.wpm} label={t("typing.wpm")} />
           <LiveMetric value={`${stats.accuracy.toFixed(0)}%`} label={t("typing.accuracy")} />
-          <LiveMetric value={stats.incorrectChars + stats.extraChars} label={t("typing.errors")} />
+          <LiveMetric value={errorCount} label={t("typing.errors")} />
         </div>
+        {status === "running" && errorCount > 0 && (
+          <button type="button" onClick={props.restart} className="nova-button mt-6 min-w-36" disabled={props.restarting}>
+            <RotateCcw size={16} /> {t("typing.tryAgain")}
+          </button>
+        )}
       </section>
     </>
   );
