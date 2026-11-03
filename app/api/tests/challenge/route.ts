@@ -6,7 +6,7 @@ import { createTestChallenge, type TestDifficulty, type TestLanguage, type TestM
 
 const MODES = new Set<TestMode>(["time", "words", "text"]);
 const LANGUAGES = new Set<TestLanguage>(["en", "ru"]);
-const DIFFICULTIES = new Set<TestDifficulty>(["easy", "medium"]);
+const DIFFICULTIES = new Set<TestDifficulty>(["easy", "medium", "hard"]);
 const DURATIONS = new Set([15, 30, 60, 120]);
 const WORD_COUNTS = new Set([10, 25, 50, 100]);
 
@@ -78,5 +78,5 @@ export async function POST(request: Request) {
 }
 
 function normalizeTextDifficulty(value: string): TestDifficulty {
-  return value === "easy" ? "easy" : "medium";
+  return value === "medium" || value === "hard" ? value : "easy";
 }

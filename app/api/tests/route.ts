@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const challengeToken = typeof body.challengeToken === "string" ? body.challengeToken : "";
     const mode = typeof body.mode === "string" ? body.mode : "";
     const language = typeof body.language === "string" ? body.language : "";
-    const difficulty = body.difficulty === "medium" ? "medium" : "easy";
+    const difficulty = body.difficulty === "medium" || body.difficulty === "hard" ? body.difficulty : "easy";
     const expectedText = typeof body.expectedText === "string" ? body.expectedText : "";
     const typedText = typeof body.typedText === "string" ? body.typedText : "";
     const duration = typeof body.duration === "number" ? body.duration : Number.NaN;

@@ -6,7 +6,7 @@ import { prepareTypingText } from "@/lib/typing-text";
 
 export type TestMode = "time" | "words" | "text";
 export type TestLanguage = "en" | "ru";
-export type TestDifficulty = "easy" | "medium";
+export type TestDifficulty = "easy" | "medium" | "hard";
 
 export interface ChallengePayload {
   version: 1;
@@ -103,7 +103,7 @@ export function verifyTestChallenge(token: string): ChallengePayload | null {
       !/^[0-9a-f-]{36}$/i.test(payload.clientAttemptId) ||
       !["time", "words", "text"].includes(payload.mode) ||
       !["en", "ru"].includes(payload.language) ||
-      !["easy", "medium"].includes(payload.difficulty ?? "easy") ||
+      !["easy", "medium", "hard"].includes(payload.difficulty ?? "easy") ||
       !payload.expectedText ||
       payload.expectedText.length > 3000 ||
       !Number.isFinite(payload.expiresAt) ||

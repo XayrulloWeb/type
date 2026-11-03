@@ -201,7 +201,7 @@ function TestControls(props: {
         <button key={item} disabled={props.disabled} onClick={() => props.changeLanguage(item)} className={clsx("test-option uppercase", props.language === item && "test-option-active")}>{item}</button>
       ))}
       <span className="mx-1 h-5 w-px bg-white/8" />
-      {(["easy", "medium"] as TestDifficulty[]).map((item) => (
+      {(["easy", "medium", "hard"] as TestDifficulty[]).map((item) => (
         <button key={item} disabled={props.disabled} onClick={() => props.changeDifficulty(item)} className={clsx("test-option", props.difficulty === item && "test-option-active")}>{t(`difficulty.${item}`)}</button>
       ))}
     </div>

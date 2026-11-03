@@ -53,7 +53,7 @@ model TestResult {
   user            User     @relation(fields: [userId], references: [id])
   mode            String // "time" or "words"
   language        String // "ru", "uz", "en"
-  difficulty      String   @default("easy") // "easy" or "medium"
+  difficulty      String   @default("easy") // "easy", "medium", or "hard"
   duration        Int // in seconds
   wordsCount      Int?
   wpm             Int

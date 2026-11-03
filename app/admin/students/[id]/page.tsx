@@ -92,7 +92,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
 
   return <div>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <Link href={`/admin/ranking${difficulty === "medium" ? "?difficulty=medium" : ""}`} className="nova-button-secondary"><ArrowLeft size={15} /> К рейтингу</Link>
+      <Link href={`/admin/ranking${difficulty === "easy" ? "" : `?difficulty=${difficulty}`}`} className="nova-button-secondary"><ArrowLeft size={15} /> К рейтингу</Link>
       <Link href="/admin/students" className="text-xs font-medium text-nova-muted transition hover:text-nova-accent">Все ученики</Link>
     </div>
 
@@ -118,7 +118,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     </section>
 
     <div className="mt-5 flex w-fit gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1.5">
-      {(["easy", "medium"] as DifficultyFilter[]).map((item) => <Link key={item} href={`?difficulty=${item}`} className={item === difficulty ? "test-option test-option-active" : "test-option"}>{item === "easy" ? "Easy · лёгкий" : "Medium · средний"}</Link>)}
+      {(["easy", "medium", "hard"] as DifficultyFilter[]).map((item) => <Link key={item} href={`?difficulty=${item}`} className={item === difficulty ? "test-option test-option-active" : "test-option"}>{difficultyLabel(item)}</Link>)}
     </div>
 
     <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -130,7 +130,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     </div>
 
     <section className="mt-8">
-      <div className="mb-4"><h2 className="text-xl font-semibold">Результаты по языкам · {difficulty === "easy" ? "Easy" : "Medium"}</h2><p className="mt-1 text-xs text-nova-muted">Место определяется по лучшей WPM, затем по средней WPM и точности.</p></div>
+      <div className="mb-4"><h2 className="text-xl font-semibold">Результаты по языкам · {difficultyLabel(difficulty, false)}</h2><p className="mt-1 text-xs text-nova-muted">Место определяется по лучшей WPM, затем по средней WPM и точности.</p></div>
       <div className="grid gap-3 xl:grid-cols-3">{languageCards.map((language) => {
         const item = stats[language.value];
         const ranking = rankings[language.value];
@@ -152,7 +152,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
       <div className="data-card overflow-x-auto">
         <table className="w-full min-w-[1200px] text-left text-sm">
           <thead className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.12em] text-nova-muted"><tr><th className="p-4">Дата</th><th className="p-4">Язык</th><th className="p-4">Сложность</th><th className="p-4 text-right">WPM</th><th className="p-4 text-right">Точность</th><th className="p-4 text-right">Время</th><th className="p-4 text-right">Статус</th><th className="p-4 text-right">Действие супер-администратора</th></tr></thead>
-          <tbody className="divide-y divide-white/5">{attempts.map((test) => <tr key={test.id} className="hover:bg-white/[0.025]"><td className="p-4 text-nova-muted">{formatDate(test.createdAt)}</td><td className="p-4 font-semibold uppercase text-nova-text">{test.language}</td><td className="p-4 text-nova-muted">{test.difficulty === "medium" ? "Medium" : "Easy"}</td><td className="p-4 text-right font-semibold text-nova-accent">{test.wpm}</td><td className="p-4 text-right text-nova-muted">{test.accuracy.toFixed(0)}%</td><td className="p-4 text-right text-nova-muted">{test.duration} сек.</td><td className="p-4 text-right"><ResultStatus isRanked={test.isRanked} reviewStatus={test.reviewStatus} accuracy={test.accuracy} /></td><td className="p-4"><ResultModerationControls resultId={test.id} isRanked={test.isRanked} reviewStatus={test.reviewStatus} wpm={test.wpm} accuracy={test.accuracy} /></td></tr>)}{attempts.length === 0 && <tr><td colSpan={8} className="p-16 text-center"><CircleUserRound className="mx-auto text-nova-muted" size={24} /><div className="mt-3 text-sm text-nova-muted">У ученика пока нет попыток.</div></td></tr>}</tbody>
+          <tbody className="divide-y divide-white/5">{attempts.map((test) => <tr key={test.id} className="hover:bg-white/[0.025]"><td className="p-4 text-nova-muted">{formatDate(test.createdAt)}</td><td className="p-4 font-semibold uppercase text-nova-text">{test.language}</td><td className="p-4 text-nova-muted">{difficultyLabel(normalizeDifficulty(test.difficulty), false)}</td><td className="p-4 text-right font-semibold text-nova-accent">{test.wpm}</td><td className="p-4 text-right text-nova-muted">{test.accuracy.toFixed(0)}%</td><td className="p-4 text-right text-nova-muted">{test.duration} сек.</td><td className="p-4 text-right"><ResultStatus isRanked={test.isRanked} reviewStatus={test.reviewStatus} accuracy={test.accuracy} /></td><td className="p-4"><ResultModerationControls resultId={test.id} isRanked={test.isRanked} reviewStatus={test.reviewStatus} wpm={test.wpm} accuracy={test.accuracy} /></td></tr>)}{attempts.length === 0 && <tr><td colSpan={8} className="p-16 text-center"><CircleUserRound className="mx-auto text-nova-muted" size={24} /><div className="mt-3 text-sm text-nova-muted">У ученика пока нет попыток.</div></td></tr>}</tbody>
         </table>
       </div>
       {totalPages > 1 && <nav aria-label="Страницы попыток" className="mt-4 flex items-center justify-end gap-2">
@@ -181,6 +181,11 @@ function aggregateStats(value: { _avg?: { wpm?: number | null; accuracy?: number
 function position(list: StudentRanking[], userId: string) {
   const index = list.findIndex((item) => item.userId === userId);
   return index < 0 ? 0 : index + 1;
+}
+
+function difficultyLabel(difficulty: DifficultyFilter, translated = true) {
+  if (!translated) return difficulty === "easy" ? "Easy" : difficulty === "medium" ? "Medium" : "Hard";
+  return difficulty === "easy" ? "Easy · лёгкий" : difficulty === "medium" ? "Medium · средний" : "Hard · сложный";
 }
 
 function formatDate(value: Date) {

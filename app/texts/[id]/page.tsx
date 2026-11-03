@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { TypingPractice } from "@/components/typing/TypingPractice";
-import { createTestChallenge } from "@/lib/test-challenge";
+import { createTestChallenge, type TestDifficulty } from "@/lib/test-challenge";
 
 export default async function LibraryTextPracticePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -16,6 +16,7 @@ export default async function LibraryTextPracticePage({ params }: { params: Prom
   ]);
   if (!student?.isActive || student.archivedAt || student.role !== "STUDENT") redirect("/login");
   if (!text?.isActive || !["en", "ru"].includes(text.language)) notFound();
-  const initialChallenge = createTestChallenge({ userId: session.user.id, mode: "text", language: text.language as "en" | "ru", difficulty: text.difficulty === "easy" ? "easy" : "medium", expectedText: text.content, textId: text.id });
+  const difficulty: TestDifficulty = text.difficulty === "medium" || text.difficulty === "hard" ? text.difficulty : "easy";
+  const initialChallenge = createTestChallenge({ userId: session.user.id, mode: "text", language: text.language as "en" | "ru", difficulty, expectedText: text.content, textId: text.id });
   return <TypingPractice user={session.user} initialChallenge={initialChallenge} libraryText={{ id: text.id, title: text.title, text: text.content, language: text.language as "en" | "ru" }} />;
 }

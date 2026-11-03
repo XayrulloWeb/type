@@ -16,6 +16,7 @@ const languages: Array<{ value: LanguageFilter; label: string; shortLabel: strin
 const difficulties: Array<{ value: DifficultyFilter; label: string }> = [
   { value: "easy", label: "Easy · лёгкий" },
   { value: "medium", label: "Medium · средний" },
+  { value: "hard", label: "Hard · сложный" },
 ];
 
 export default async function AdminRankingPage({ searchParams }: RankingPageProps) {
@@ -42,7 +43,7 @@ export default async function AdminRankingPage({ searchParams }: RankingPageProp
 
   return <div>
     <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-      <div><p className="page-eyebrow">Успеваемость школы</p><h1 className="page-title">Рейтинг учеников</h1><p className="page-subtitle">Отдельные рейтинги Easy и Medium для всей школы и каждого класса.</p></div>
+      <div><p className="page-eyebrow">Успеваемость школы</p><h1 className="page-title">Рейтинг учеников</h1><p className="page-subtitle">Отдельные рейтинги Easy, Medium и Hard для всей школы и каждого класса.</p></div>
       <div className="nova-badge w-fit"><Medal size={13} /> Место по лучшей скорости ученика</div>
     </div>
 
@@ -60,7 +61,7 @@ export default async function AdminRankingPage({ searchParams }: RankingPageProp
           {languages.map((item) => <Link key={item.value} href={rankingHref(selectedClass?.id, item.value, difficulty)} className={item.value === language ? "rounded-xl border border-nova-accent/30 bg-nova-accent/10 p-4 text-nova-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]" : "rounded-xl border border-white/[0.06] bg-white/[0.025] p-4 text-nova-muted transition hover:border-white/[0.12] hover:text-nova-text"}><div className="text-[10px] font-semibold tracking-[0.16em]">{item.shortLabel}</div><div className="mt-1 text-sm font-semibold">{item.label}</div></Link>)}
         </div>
         <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-nova-text"><Medal size={16} className="text-nova-accent" /> Выберите сложность</div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
           {difficulties.map((item) => <Link key={item.value} href={rankingHref(selectedClass?.id, language, item.value)} className={item.value === difficulty ? "rounded-xl border border-nova-accent/30 bg-nova-accent/10 p-4 text-sm font-semibold text-nova-accent" : "rounded-xl border border-white/[0.06] bg-white/[0.025] p-4 text-sm font-semibold text-nova-muted transition hover:border-white/[0.12] hover:text-nova-text"}>{item.label}</Link>)}
         </div>
       </div>

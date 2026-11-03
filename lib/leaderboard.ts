@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 
 export type Period = "today" | "week" | "month" | "all";
 export type LanguageFilter = "all" | "en" | "ru";
-export type DifficultyFilter = "easy" | "medium";
+export type DifficultyFilter = "easy" | "medium" | "hard";
 
 export interface StudentRanking {
   userId: string;
@@ -24,7 +24,7 @@ export function normalizeLanguage(value: string | string[] | undefined): Languag
 }
 
 export function normalizeDifficulty(value: string | string[] | undefined): DifficultyFilter {
-  return value === "medium" ? "medium" : "easy";
+  return value === "medium" || value === "hard" ? value : "easy";
 }
 
 function periodStart(period: Period) {

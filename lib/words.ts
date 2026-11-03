@@ -19,10 +19,29 @@ function shuffle<T>(values: readonly T[]) {
   return copy;
 }
 
-export function getRandomWords(language: "en" | "ru", count: number, exclude?: string, difficulty: "easy" | "medium" = "easy"): string {
-  const dictionary = difficulty === "medium"
-    ? sentenceBanks[language].flatMap((sentence) => sentence.split(/\s+/))
-    : language === "en" ? wordsEn : wordsRu;
+export type WordDifficulty = "easy" | "medium" | "hard";
+
+function capitalize(word: string) {
+  return word ? `${word[0].toUpperCase()}${word.slice(1)}` : word;
+}
+
+function difficultyDictionary(language: "en" | "ru", difficulty: WordDifficulty) {
+  if (difficulty === "easy") {
+    return (language === "en" ? wordsEn : wordsRu).map((word) => word.toLowerCase());
+  }
+
+  const sentenceWords = sentenceBanks[language].flatMap((sentence) => sentence.split(/\s+/));
+  if (difficulty === "hard") return sentenceWords;
+
+  const minimumLength = language === "en" ? 7 : 8;
+  const longerWords = sentenceWords
+    .map((word) => word.replace(/[^\p{L}\p{M}]/gu, "").toLowerCase())
+    .filter((word) => word.length >= minimumLength);
+  return [...new Set(longerWords)];
+}
+
+export function getRandomWords(language: "en" | "ru", count: number, exclude?: string, difficulty: WordDifficulty = "easy"): string {
+  const dictionary = difficultyDictionary(language, difficulty);
   let result = "";
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const selected: string[] = [];
@@ -32,7 +51,9 @@ export function getRandomWords(language: "en" | "ru", count: number, exclude?: s
       const next = bag.pop();
       if (next && next !== selected[selected.length - 1]) selected.push(next);
     }
-    result = selected.join(" ");
+    result = selected
+      .map((word, index) => difficulty === "medium" && index % 8 === 7 ? capitalize(word) : word)
+      .join(" ");
     if (result !== exclude) return result;
   }
   return result;
@@ -70,6 +91,12 @@ const sentenceBanks = {
     "Maps show more than roads because they also describe distance, landscape, and direction.",
     "Creative work combines imagination with patient revision and attention to detail.",
     "Sharing reliable knowledge makes a school community stronger and more independent.",
+    "Before starting, check three things: posture, hand position, and the chosen keyboard layout.",
+    "Can a difficult exercise become familiar? Yes, if every mistake is reviewed carefully.",
+    "Accuracy comes first; speed follows when correct movements become automatic.",
+    "The final result depends on several factors - focus, rhythm, practice, and patience.",
+    "During a timed test, remember this rule: stay calm and type only what you see.",
+    "A student may pause briefly (without leaving the task) and then continue at a steady pace.",
   ],
   ru: [
     "Спокойное утро даёт время составить план и выбрать самое важное дело на день.",
@@ -102,6 +129,12 @@ const sentenceBanks = {
     "Карта показывает не только дороги, но также расстояние, направление и особенности местности.",
     "Творческая работа соединяет воображение, терпеливую проверку и внимание к деталям.",
     "Обмен надёжными знаниями делает школьное сообщество сильнее и самостоятельнее.",
+    "Перед началом проверьте три вещи: посадку, положение рук и выбранную раскладку клавиатуры.",
+    "Может ли трудное упражнение стать привычным? Да, если внимательно разбирать каждую ошибку.",
+    "Сначала развивается точность; скорость приходит, когда верные движения становятся автоматическими.",
+    "Итог зависит от нескольких факторов - внимания, ритма, практики и терпения.",
+    "Во время теста помните правило: сохраняйте спокойствие и печатайте только видимый текст.",
+    "Ученик может ненадолго остановиться (не покидая задание), а затем продолжить в ровном темпе.",
   ],
   uz: [
     "Sokin tong kunni rejalashtirish va eng muhim vazifani tanlash uchun vaqt beradi.",
@@ -137,13 +170,17 @@ const sentenceBanks = {
   ],
 };
 
-export function getPreparedText(language: "en" | "ru", exclude?: string, difficulty: "easy" | "medium" = "easy") {
+export function getPreparedText(language: "en" | "ru", exclude?: string, difficulty: WordDifficulty = "easy") {
+  if (difficulty !== "hard") {
+    const baseCount = difficulty === "medium" ? 90 : 75;
+    const variableCount = difficulty === "medium" ? 31 : 26;
+    return getRandomWords(language, baseCount + Math.floor(Math.random() * variableCount), exclude, difficulty);
+  }
+
   const bank = sentenceBanks[language];
   let result = "";
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const sentenceCount = difficulty === "medium"
-      ? 6 + Math.floor(Math.random() * 3)
-      : 4 + Math.floor(Math.random() * 3);
+    const sentenceCount = 7 + Math.floor(Math.random() * 3);
     result = shuffle(bank).slice(0, sentenceCount).join(" ");
     if (result !== exclude) return result;
   }

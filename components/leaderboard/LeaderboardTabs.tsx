@@ -30,7 +30,7 @@ export function LeaderboardTabs({ active, period, language, difficulty }: { acti
         ))}
       </nav>
       <nav className="flex gap-1 overflow-x-auto" aria-label="Leaderboard difficulty">
-        {(["easy", "medium"] as DifficultyFilter[]).map((value) => (
+        {(["easy", "medium", "hard"] as DifficultyFilter[]).map((value) => (
           <Link key={value} href={`/leaderboard/${active}?period=${period}&language=${language}&difficulty=${value}`} className={value === difficulty ? "test-option test-option-active" : "test-option"}>{t(`difficulty.${value}`)}</Link>
         ))}
       </nav>
