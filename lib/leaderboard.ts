@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 
 export type Period = "today" | "week" | "month" | "all";
 export type LanguageFilter = "all" | "en" | "ru";
+export type DifficultyFilter = "easy" | "medium";
 
 export interface StudentRanking {
   userId: string;
@@ -22,6 +23,10 @@ export function normalizeLanguage(value: string | string[] | undefined): Languag
   return value === "en" || value === "ru" ? value : "all";
 }
 
+export function normalizeDifficulty(value: string | string[] | undefined): DifficultyFilter {
+  return value === "medium" ? "medium" : "easy";
+}
+
 function periodStart(period: Period) {
   if (period === "all") return undefined;
   const date = new Date();
@@ -31,12 +36,13 @@ function periodStart(period: Period) {
   return date;
 }
 
-export async function getStudentRankings(period: Period, classId?: string, language: LanguageFilter = "all") {
+export async function getStudentRankings(period: Period, classId?: string, language: LanguageFilter = "all", difficulty: DifficultyFilter = "easy") {
   const createdAt = periodStart(period);
   const groups = await prisma.testResult.groupBy({
     by: ["userId"],
     where: {
       isRanked: true,
+      difficulty,
       ...(createdAt ? { createdAt: { gte: createdAt } } : {}),
       ...(language !== "all" ? { language } : { language: { in: ["ru", "en"] } }),
       ...(classId
@@ -68,11 +74,11 @@ export async function getStudentRankings(period: Period, classId?: string, langu
         lastActiveAt: item._max.createdAt,
       }];
     })
-    .sort((a, b) => b.bestWpm - a.bestWpm || b.averageAccuracy - a.averageAccuracy || b.averageWpm - a.averageWpm);
+    .sort((a, b) => b.bestWpm - a.bestWpm || b.averageWpm - a.averageWpm || b.averageAccuracy - a.averageAccuracy);
 }
 
-export async function getClassRankings(period: Period, language: LanguageFilter = "all") {
-  const students = await getStudentRankings(period, undefined, language);
+export async function getClassRankings(period: Period, language: LanguageFilter = "all", difficulty: DifficultyFilter = "easy") {
+  const students = await getStudentRankings(period, undefined, language, difficulty);
   const groups = new Map<string, {
     id: string;
     name: string;

@@ -19,8 +19,10 @@ function shuffle<T>(values: readonly T[]) {
   return copy;
 }
 
-export function getRandomWords(language: "en" | "ru", count: number, exclude?: string): string {
-  const dictionary = language === "en" ? wordsEn : wordsRu;
+export function getRandomWords(language: "en" | "ru", count: number, exclude?: string, difficulty: "easy" | "medium" = "easy"): string {
+  const dictionary = difficulty === "medium"
+    ? sentenceBanks[language].flatMap((sentence) => sentence.split(/\s+/))
+    : language === "en" ? wordsEn : wordsRu;
   let result = "";
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const selected: string[] = [];
@@ -135,11 +137,13 @@ const sentenceBanks = {
   ],
 };
 
-export function getPreparedText(language: "en" | "ru", exclude?: string) {
+export function getPreparedText(language: "en" | "ru", exclude?: string, difficulty: "easy" | "medium" = "easy") {
   const bank = sentenceBanks[language];
   let result = "";
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const sentenceCount = 4 + Math.floor(Math.random() * 3);
+    const sentenceCount = difficulty === "medium"
+      ? 6 + Math.floor(Math.random() * 3)
+      : 4 + Math.floor(Math.random() * 3);
     result = shuffle(bank).slice(0, sentenceCount).join(" ");
     if (result !== exclude) return result;
   }

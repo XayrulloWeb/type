@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, BarChart3, CalendarClock, ChevronLeft, ChevronRight, CircleUserRound, Medal, ShieldCheck } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { getStudentRankings, type LanguageFilter, type StudentRanking } from "@/lib/leaderboard";
+import { getStudentRankings, normalizeDifficulty, type DifficultyFilter, type LanguageFilter, type StudentRanking } from "@/lib/leaderboard";
 import { requireSuperAdminPage } from "@/lib/admin";
 import { ResultModerationControls } from "@/components/admin/ResultModerationControls";
 
@@ -11,7 +11,7 @@ const ATTEMPTS_PER_PAGE = 25;
 
 interface StudentDetailsPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ attemptsPage?: string | string[] }>;
+  searchParams: Promise<{ attemptsPage?: string | string[]; difficulty?: string | string[] }>;
 }
 
 const languageCards: Array<{ value: LanguageFilter; label: string }> = [
@@ -24,6 +24,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
   await requireSuperAdminPage();
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const requestedPage = positivePage(query.attemptsPage);
+  const difficulty = normalizeDifficulty(query.difficulty);
   const student = await prisma.user.findFirst({
     where: { id, role: "STUDENT" },
     include: { class: true },
@@ -31,14 +32,12 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
   if (!student) notFound();
 
   const testsWhere: Prisma.TestResultWhereInput = { userId: id, language: { in: ["ru", "en"] } };
-  const rankedWhere: Prisma.TestResultWhereInput = { ...testsWhere, isRanked: true };
+  const rankedWhere: Prisma.TestResultWhereInput = { ...testsWhere, isRanked: true, difficulty };
   const [
     attemptsCount,
     overallAggregate,
     ruAggregate,
     enAggregate,
-    firstRanked,
-    latestRanked,
     schoolAll,
     schoolRu,
     schoolEn,
@@ -47,11 +46,9 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     prisma.testResult.aggregate({ where: rankedWhere, _avg: { wpm: true, accuracy: true }, _max: { wpm: true }, _count: { _all: true } }),
     prisma.testResult.aggregate({ where: { ...rankedWhere, language: "ru" }, _avg: { wpm: true, accuracy: true }, _max: { wpm: true }, _count: { _all: true } }),
     prisma.testResult.aggregate({ where: { ...rankedWhere, language: "en" }, _avg: { wpm: true, accuracy: true }, _max: { wpm: true }, _count: { _all: true } }),
-    prisma.testResult.findFirst({ where: rankedWhere, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, wpm: true } }),
-    prisma.testResult.findFirst({ where: rankedWhere, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, wpm: true } }),
-    getStudentRankings("all", undefined, "all"),
-    getStudentRankings("all", undefined, "ru"),
-    getStudentRankings("all", undefined, "en"),
+    getStudentRankings("all", undefined, "all", difficulty),
+    getStudentRankings("all", undefined, "ru", difficulty),
+    getStudentRankings("all", undefined, "en", difficulty),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(attemptsCount / ATTEMPTS_PER_PAGE));
@@ -65,6 +62,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
       id: true,
       createdAt: true,
       language: true,
+      difficulty: true,
       wpm: true,
       accuracy: true,
       duration: true,
@@ -86,15 +84,15 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     ru: aggregateStats(ruAggregate),
     en: aggregateStats(enAggregate),
   };
-  const progress = firstRanked && latestRanked && firstRanked.id !== latestRanked.id
-    ? latestRanked.wpm - firstRanked.wpm
+  const progress = student.initialWpm !== null && stats.all.bestWpm > 0
+    ? stats.all.bestWpm - student.initialWpm
     : null;
   const shownFrom = attemptsCount ? (attemptsPage - 1) * ATTEMPTS_PER_PAGE + 1 : 0;
   const shownTo = Math.min(attemptsPage * ATTEMPTS_PER_PAGE, attemptsCount);
 
   return <div>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <Link href="/admin/ranking" className="nova-button-secondary"><ArrowLeft size={15} /> К рейтингу</Link>
+      <Link href={`/admin/ranking${difficulty === "medium" ? "?difficulty=medium" : ""}`} className="nova-button-secondary"><ArrowLeft size={15} /> К рейтингу</Link>
       <Link href="/admin/students" className="text-xs font-medium text-nova-muted transition hover:text-nova-accent">Все ученики</Link>
     </div>
 
@@ -108,6 +106,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-nova-muted">
             <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">Класс: <b className="text-nova-text">{student.class?.name ?? "—"}</b></span>
             <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">Логин: <b className="font-mono text-nova-text">{student.username}</b></span>
+            <span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5">Первоначальная WPM: <b className="text-nova-text">{student.initialWpm ?? "не указана"}</b></span>
             <span className={student.isActive && !student.archivedAt ? "rounded-full border border-emerald-500/20 bg-emerald-500/[0.07] px-3 py-1.5 text-emerald-400" : "rounded-full border border-nova-error/20 bg-nova-error/[0.07] px-3 py-1.5 text-nova-error"}>{student.isActive && !student.archivedAt ? "Активен" : "Доступ закрыт"}</span>
           </div>
         </div>
@@ -118,15 +117,20 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
       </div>
     </section>
 
-    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="mt-5 flex w-fit gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1.5">
+      {(["easy", "medium"] as DifficultyFilter[]).map((item) => <Link key={item} href={`?difficulty=${item}`} className={item === difficulty ? "test-option test-option-active" : "test-option"}>{item === "easy" ? "Easy · лёгкий" : "Medium · средний"}</Link>)}
+    </div>
+
+    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
       <TopStat value={stats.all.tests} label="Тестов в рейтинге" icon={<ShieldCheck size={15} />} />
+      <TopStat value={student.initialWpm ?? "—"} label="Первоначальная WPM" icon={<CalendarClock size={15} />} />
       <TopStat value={stats.all.averageWpm || "—"} label="Средняя WPM" icon={<BarChart3 size={15} />} />
       <TopStat value={stats.all.bestWpm || "—"} label="Лучшая WPM" accent icon={<Medal size={15} />} />
-      <TopStat value={progress === null ? "—" : `${progress > 0 ? "+" : ""}${progress}`} label="Прогресс WPM" accent={progress !== null && progress > 0} icon={<CalendarClock size={15} />} />
+      <TopStat value={progress === null ? "—" : `${progress > 0 ? "+" : ""}${progress}`} label="Рост от первоначальной WPM" accent={progress !== null && progress > 0} icon={<BarChart3 size={15} />} />
     </div>
 
     <section className="mt-8">
-      <div className="mb-4"><h2 className="text-xl font-semibold">Результаты по языкам</h2><p className="mt-1 text-xs text-nova-muted">Место определяется по лучшей WPM; средние показатели сохранены для статистики.</p></div>
+      <div className="mb-4"><h2 className="text-xl font-semibold">Результаты по языкам · {difficulty === "easy" ? "Easy" : "Medium"}</h2><p className="mt-1 text-xs text-nova-muted">Место определяется по лучшей WPM, затем по средней WPM и точности.</p></div>
       <div className="grid gap-3 xl:grid-cols-3">{languageCards.map((language) => {
         const item = stats[language.value];
         const ranking = rankings[language.value];
@@ -146,15 +150,15 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
         <div className="text-xs text-nova-muted">Показано {shownFrom}–{shownTo} из {attemptsCount}</div>
       </div>
       <div className="data-card overflow-x-auto">
-        <table className="w-full min-w-[1120px] text-left text-sm">
-          <thead className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.12em] text-nova-muted"><tr><th className="p-4">Дата</th><th className="p-4">Язык</th><th className="p-4 text-right">WPM</th><th className="p-4 text-right">Точность</th><th className="p-4 text-right">Время</th><th className="p-4 text-right">Статус</th><th className="p-4 text-right">Действие супер-администратора</th></tr></thead>
-          <tbody className="divide-y divide-white/5">{attempts.map((test) => <tr key={test.id} className="hover:bg-white/[0.025]"><td className="p-4 text-nova-muted">{formatDate(test.createdAt)}</td><td className="p-4 font-semibold uppercase text-nova-text">{test.language}</td><td className="p-4 text-right font-semibold text-nova-accent">{test.wpm}</td><td className="p-4 text-right text-nova-muted">{test.accuracy.toFixed(0)}%</td><td className="p-4 text-right text-nova-muted">{test.duration} сек.</td><td className="p-4 text-right"><ResultStatus isRanked={test.isRanked} reviewStatus={test.reviewStatus} accuracy={test.accuracy} /></td><td className="p-4"><ResultModerationControls resultId={test.id} isRanked={test.isRanked} reviewStatus={test.reviewStatus} wpm={test.wpm} accuracy={test.accuracy} /></td></tr>)}{attempts.length === 0 && <tr><td colSpan={7} className="p-16 text-center"><CircleUserRound className="mx-auto text-nova-muted" size={24} /><div className="mt-3 text-sm text-nova-muted">У ученика пока нет попыток.</div></td></tr>}</tbody>
+        <table className="w-full min-w-[1200px] text-left text-sm">
+          <thead className="border-b border-white/[0.06] text-[10px] uppercase tracking-[0.12em] text-nova-muted"><tr><th className="p-4">Дата</th><th className="p-4">Язык</th><th className="p-4">Сложность</th><th className="p-4 text-right">WPM</th><th className="p-4 text-right">Точность</th><th className="p-4 text-right">Время</th><th className="p-4 text-right">Статус</th><th className="p-4 text-right">Действие супер-администратора</th></tr></thead>
+          <tbody className="divide-y divide-white/5">{attempts.map((test) => <tr key={test.id} className="hover:bg-white/[0.025]"><td className="p-4 text-nova-muted">{formatDate(test.createdAt)}</td><td className="p-4 font-semibold uppercase text-nova-text">{test.language}</td><td className="p-4 text-nova-muted">{test.difficulty === "medium" ? "Medium" : "Easy"}</td><td className="p-4 text-right font-semibold text-nova-accent">{test.wpm}</td><td className="p-4 text-right text-nova-muted">{test.accuracy.toFixed(0)}%</td><td className="p-4 text-right text-nova-muted">{test.duration} сек.</td><td className="p-4 text-right"><ResultStatus isRanked={test.isRanked} reviewStatus={test.reviewStatus} accuracy={test.accuracy} /></td><td className="p-4"><ResultModerationControls resultId={test.id} isRanked={test.isRanked} reviewStatus={test.reviewStatus} wpm={test.wpm} accuracy={test.accuracy} /></td></tr>)}{attempts.length === 0 && <tr><td colSpan={8} className="p-16 text-center"><CircleUserRound className="mx-auto text-nova-muted" size={24} /><div className="mt-3 text-sm text-nova-muted">У ученика пока нет попыток.</div></td></tr>}</tbody>
         </table>
       </div>
       {totalPages > 1 && <nav aria-label="Страницы попыток" className="mt-4 flex items-center justify-end gap-2">
-        {attemptsPage > 1 ? <Link href={`?attemptsPage=${attemptsPage - 1}#attempts`} className="nova-button-secondary"><ChevronLeft size={15} /> Назад</Link> : <span className="nova-button-secondary cursor-not-allowed opacity-40"><ChevronLeft size={15} /> Назад</span>}
+        {attemptsPage > 1 ? <Link href={`?difficulty=${difficulty}&attemptsPage=${attemptsPage - 1}#attempts`} className="nova-button-secondary"><ChevronLeft size={15} /> Назад</Link> : <span className="nova-button-secondary cursor-not-allowed opacity-40"><ChevronLeft size={15} /> Назад</span>}
         <span className="px-3 text-xs text-nova-muted">Страница <b className="text-nova-text">{attemptsPage}</b> из {totalPages}</span>
-        {attemptsPage < totalPages ? <Link href={`?attemptsPage=${attemptsPage + 1}#attempts`} className="nova-button-secondary">Дальше <ChevronRight size={15} /></Link> : <span className="nova-button-secondary cursor-not-allowed opacity-40">Дальше <ChevronRight size={15} /></span>}
+        {attemptsPage < totalPages ? <Link href={`?difficulty=${difficulty}&attemptsPage=${attemptsPage + 1}#attempts`} className="nova-button-secondary">Дальше <ChevronRight size={15} /></Link> : <span className="nova-button-secondary cursor-not-allowed opacity-40">Дальше <ChevronRight size={15} /></span>}
       </nav>}
     </section>
   </div>;

@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     const challengeToken = typeof body.challengeToken === "string" ? body.challengeToken : "";
     const mode = typeof body.mode === "string" ? body.mode : "";
     const language = typeof body.language === "string" ? body.language : "";
+    const difficulty = body.difficulty === "medium" ? "medium" : "easy";
     const expectedText = typeof body.expectedText === "string" ? body.expectedText : "";
     const typedText = typeof body.typedText === "string" ? body.typedText : "";
     const duration = typeof body.duration === "number" ? body.duration : Number.NaN;
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       challenge.clientAttemptId !== clientAttemptId ||
       challenge.mode !== mode ||
       challenge.language !== language ||
+      challenge.difficulty !== difficulty ||
       challenge.expectedText !== expectedText ||
       (challenge.assignmentId ?? null) !== assignmentId ||
       (challenge.textId ?? null) !== textId ||
@@ -84,15 +86,15 @@ export async function POST(request: Request) {
 
     const existingResult = await prisma.testResult.findUnique({
       where: { clientAttemptId },
-      select: { id: true, userId: true, isRanked: true, reviewStatus: true, reviewReasons: true, riskScore: true, wpm: true, accuracy: true },
+      select: { id: true, userId: true, difficulty: true, isRanked: true, reviewStatus: true, reviewReasons: true, riskScore: true, wpm: true, accuracy: true },
     });
     if (existingResult) {
       if (existingResult.userId !== session.user.id) {
         return NextResponse.json({ error: "Invalid test result." }, { status: 400 });
       }
       const [overallAverage, languageAverage, assignmentResult] = await Promise.all([
-        prisma.testResult.aggregate({ where: { userId: session.user.id, isRanked: true, language: { in: ["ru", "en"] } }, _avg: { wpm: true }, _count: { _all: true } }),
-        prisma.testResult.aggregate({ where: { userId: session.user.id, isRanked: true, language }, _avg: { wpm: true }, _count: { _all: true } }),
+        prisma.testResult.aggregate({ where: { userId: session.user.id, isRanked: true, difficulty: existingResult.difficulty, language: { in: ["ru", "en"] } }, _avg: { wpm: true }, _count: { _all: true } }),
+        prisma.testResult.aggregate({ where: { userId: session.user.id, isRanked: true, difficulty: existingResult.difficulty, language }, _avg: { wpm: true }, _count: { _all: true } }),
         assignmentId ? prisma.assignmentResult.findUnique({ where: { assignmentId_userId: { assignmentId, userId: session.user.id } }, select: { status: true } }) : null,
       ]);
       return NextResponse.json({
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
       focusLostCount,
     });
     const previousResults = await prisma.testResult.findMany({
-      where: { userId: session.user.id, isRanked: true, language: { in: ["ru", "en"] } },
+      where: { userId: session.user.id, isRanked: true, difficulty, language: { in: ["ru", "en"] } },
       orderBy: { createdAt: "desc" },
       take: 30,
       select: { wpm: true, accuracy: true, duration: true, mode: true, language: true },
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
           userId: session.user.id,
           mode,
           language,
+          difficulty,
           duration: Math.max(1, Math.round(stats.timeElapsed)),
           wordsCount,
           wpm: stats.wpm,
@@ -207,12 +210,12 @@ export async function POST(request: Request) {
 
     const [overallAverage, languageAverage] = await Promise.all([
       prisma.testResult.aggregate({
-        where: { userId: session.user.id, isRanked: true, language: { in: ["ru", "en"] } },
+        where: { userId: session.user.id, isRanked: true, difficulty, language: { in: ["ru", "en"] } },
         _avg: { wpm: true },
         _count: { _all: true },
       }),
       prisma.testResult.aggregate({
-        where: { userId: session.user.id, isRanked: true, language },
+        where: { userId: session.user.id, isRanked: true, difficulty, language },
         _avg: { wpm: true },
         _count: { _all: true },
       }),

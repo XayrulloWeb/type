@@ -21,6 +21,7 @@ export default async function StudentsPage() {
       lastName: item.lastName,
       username: item.username,
       className: item.class?.name ?? "—",
+      initialWpm: item.initialWpm,
       isActive: item.isActive,
       archivedAt: item.archivedAt?.toISOString() ?? null,
       passwordAvailable: Boolean(item.passwordEncrypted),

@@ -10,7 +10,7 @@ import { TypingArea } from "@/components/typing/TypingArea";
 import { CapsLockWarning } from "@/components/typing/CapsLockWarning";
 import { useTypingEngine, type TypingMode } from "@/hooks/useTypingEngine";
 import type { TypingStats, TypingTelemetry } from "@/lib/typing";
-import type { TestChallenge } from "@/lib/test-challenge";
+import type { TestChallenge, TestDifficulty } from "@/lib/test-challenge";
 import { useI18n } from "@/components/LocaleProvider";
 import { SpeedStandardCard } from "@/components/SpeedStandardCard";
 
@@ -45,13 +45,14 @@ interface LibraryPractice {
   language: Language;
 }
 
-export function TypingPractice({ user, assignment, libraryText, initialChallenge, adminMode = false, speedStandard }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; adminMode?: boolean; speedStandard?: { grade: number; bestWpm: number } }) {
+export function TypingPractice({ user, assignment, libraryText, initialChallenge, adminMode = false, speedStandard }: { user: User; assignment?: AssignmentPractice; libraryText?: LibraryPractice; initialChallenge: TestChallenge; adminMode?: boolean; speedStandard?: { grade: number; bestWpmByDifficulty: Record<TestDifficulty, number> } }) {
   const fixedText = assignment ?? libraryText;
   const { t } = useI18n();
   const [mode, setMode] = useState<TypingMode>(initialChallenge.mode);
   const [duration, setDuration] = useState(initialChallenge.selectedDuration ?? 60);
   const [wordCount, setWordCount] = useState(initialChallenge.wordsCount ?? 25);
   const [language, setLanguage] = useState<Language>(initialChallenge.language);
+  const [difficulty, setDifficulty] = useState<TestDifficulty>(initialChallenge.difficulty);
   const [challenge, setChallenge] = useState(initialChallenge);
   const [sessionKey, setSessionKey] = useState(0);
   const [focusMode, setFocusMode] = useState(false);
@@ -59,7 +60,7 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
   const [challengeLoading, setChallengeLoading] = useState(false);
   const [challengeError, setChallengeError] = useState(false);
 
-  const loadChallenge = useCallback(async (nextMode: TypingMode, nextLanguage: Language, nextDuration: number, nextWordCount: number) => {
+  const loadChallenge = useCallback(async (nextMode: TypingMode, nextLanguage: Language, nextDifficulty: TestDifficulty, nextDuration: number, nextWordCount: number) => {
     if (challengeLoading) return;
     setChallengeLoading(true);
     setChallengeError(false);
@@ -70,6 +71,7 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
         body: JSON.stringify(assignment ? { assignmentId: assignment.id } : libraryText ? { textId: libraryText.id } : {
           mode: nextMode,
           language: nextLanguage,
+          difficulty: nextDifficulty,
           selectedDuration: nextMode === "time" ? nextDuration : undefined,
           wordsCount: nextMode === "words" ? nextWordCount : undefined,
         }),
@@ -78,6 +80,7 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
       const nextChallenge = await response.json() as TestChallenge;
       setMode(nextChallenge.mode);
       setLanguage(nextChallenge.language);
+      setDifficulty(nextChallenge.difficulty);
       setDuration(nextChallenge.selectedDuration ?? nextDuration);
       setWordCount(nextChallenge.wordsCount ?? nextWordCount);
       setChallenge(nextChallenge);
@@ -90,23 +93,27 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
   }, [assignment, challengeLoading, libraryText]);
 
   const restart = useCallback(() => {
-    void loadChallenge(mode, language, duration, wordCount);
-  }, [duration, language, loadChallenge, mode, wordCount]);
+    void loadChallenge(mode, language, difficulty, duration, wordCount);
+  }, [difficulty, duration, language, loadChallenge, mode, wordCount]);
 
   function changeMode(next: TypingMode) {
-    void loadChallenge(next, language, duration, wordCount);
+    void loadChallenge(next, language, difficulty, duration, wordCount);
   }
 
   function changeLanguage(next: Language) {
-    void loadChallenge(mode, next, duration, wordCount);
+    void loadChallenge(mode, next, difficulty, duration, wordCount);
+  }
+
+  function changeDifficulty(next: TestDifficulty) {
+    void loadChallenge(mode, language, next, duration, wordCount);
   }
 
   function changeDuration(next: number) {
-    void loadChallenge(mode, language, next, wordCount);
+    void loadChallenge(mode, language, difficulty, next, wordCount);
   }
 
   function changeWordCount(next: number) {
-    void loadChallenge(mode, language, duration, next);
+    void loadChallenge(mode, language, difficulty, duration, next);
   }
 
   async function toggleFullscreen() {
@@ -126,25 +133,28 @@ export function TypingPractice({ user, assignment, libraryText, initialChallenge
           duration={duration}
           wordCount={wordCount}
           language={language}
+          difficulty={difficulty}
           expectedText={challenge.expectedText}
           challengeToken={challenge.token}
           clientAttemptId={challenge.clientAttemptId}
           assignmentId={assignment?.id}
           textId={libraryText?.id}
           adminMode={adminMode}
-          speedStandard={speedStandard}
+          speedStandard={speedStandard ? { grade: speedStandard.grade, bestWpm: speedStandard.bestWpmByDifficulty[difficulty] } : undefined}
           restart={restart}
           restarting={challengeLoading}
           controls={
-            <>{speedStandard && <SpeedStandardCard grade={speedStandard.grade} bestWpm={speedStandard.bestWpm} compact className="mb-4" />}{fixedText ? <div className="data-card mb-14 w-full max-w-3xl p-5 text-center sm:mb-20"><Link href={assignment ? "/assignments" : "/texts"} className="mb-2 inline-flex items-center gap-1 text-xs text-nova-muted transition hover:text-nova-text"><ArrowLeft size={13} /> {assignment ? t("typing.backAssignments") : t("typing.backTexts")}</Link><div className="text-sm font-semibold">{fixedText.title}</div><div className="mt-1 text-xs uppercase tracking-[0.14em] text-nova-accent">{t(`language.${fixedText.language}`)} · {t("typing.text")}</div></div> : <TestControls
+            <>{speedStandard && <SpeedStandardCard grade={speedStandard.grade} bestWpm={speedStandard.bestWpmByDifficulty[difficulty]} compact className="mb-4" />}{fixedText ? <div className="data-card mb-14 w-full max-w-3xl p-5 text-center sm:mb-20"><Link href={assignment ? "/assignments" : "/texts"} className="mb-2 inline-flex items-center gap-1 text-xs text-nova-muted transition hover:text-nova-text"><ArrowLeft size={13} /> {assignment ? t("typing.backAssignments") : t("typing.backTexts")}</Link><div className="text-sm font-semibold">{fixedText.title}</div><div className="mt-1 text-xs uppercase tracking-[0.14em] text-nova-accent">{t(`language.${fixedText.language}`)} · {t(`difficulty.${difficulty}`)} · {t("typing.text")}</div></div> : <TestControls
               mode={mode}
               duration={duration}
               wordCount={wordCount}
               language={language}
+              difficulty={difficulty}
               changeMode={changeMode}
               changeDuration={changeDuration}
               changeWordCount={changeWordCount}
               changeLanguage={changeLanguage}
+              changeDifficulty={changeDifficulty}
               disabled={challengeLoading}
             />}</>
           }
@@ -168,10 +178,12 @@ function TestControls(props: {
   duration: number;
   wordCount: number;
   language: Language;
+  difficulty: TestDifficulty;
   changeMode: (mode: TypingMode) => void;
   changeDuration: (duration: number) => void;
   changeWordCount: (count: number) => void;
   changeLanguage: (language: Language) => void;
+  changeDifficulty: (difficulty: TestDifficulty) => void;
   disabled: boolean;
 }) {
   const { t } = useI18n();
@@ -188,6 +200,10 @@ function TestControls(props: {
       {(["en", "ru"] as Language[]).map((item) => (
         <button key={item} disabled={props.disabled} onClick={() => props.changeLanguage(item)} className={clsx("test-option uppercase", props.language === item && "test-option-active")}>{item}</button>
       ))}
+      <span className="mx-1 h-5 w-px bg-white/8" />
+      {(["easy", "medium"] as TestDifficulty[]).map((item) => (
+        <button key={item} disabled={props.disabled} onClick={() => props.changeDifficulty(item)} className={clsx("test-option", props.difficulty === item && "test-option-active")}>{t(`difficulty.${item}`)}</button>
+      ))}
     </div>
   );
 }
@@ -197,6 +213,7 @@ function TypingSession(props: {
   duration: number;
   wordCount: number;
   language: Language;
+  difficulty: TestDifficulty;
   expectedText: string;
   challengeToken: string;
   clientAttemptId: string;
@@ -229,6 +246,7 @@ function TypingSession(props: {
             challengeToken: props.challengeToken,
             clientAttemptId: props.clientAttemptId,
             language: props.language,
+            difficulty: props.difficulty,
             selectedDuration: props.mode === "time" ? props.duration : undefined,
             wordsCount: props.mode === "words" ? props.wordCount : undefined,
             expectedText: props.expectedText,
@@ -249,7 +267,7 @@ function TypingSession(props: {
     }
     setSaving(false);
     setSaveError(true);
-  }, [props.assignmentId, props.challengeToken, props.clientAttemptId, props.duration, props.expectedText, props.language, props.mode, props.textId, props.wordCount]);
+  }, [props.assignmentId, props.challengeToken, props.clientAttemptId, props.difficulty, props.duration, props.expectedText, props.language, props.mode, props.textId, props.wordCount]);
 
   const saveResult = useCallback((finalStats: TypingStats & { pasteDetected: boolean; typedText: string; telemetry: TypingTelemetry }) => {
     lastResultRef.current = finalStats;

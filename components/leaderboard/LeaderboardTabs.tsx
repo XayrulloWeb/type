@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { LanguageFilter, Period } from "@/lib/leaderboard";
+import type { DifficultyFilter, LanguageFilter, Period } from "@/lib/leaderboard";
 import { useI18n } from "@/components/LocaleProvider";
 
-export function LeaderboardTabs({ active, period, language }: { active: "class" | "school" | "classes"; period: Period; language: LanguageFilter }) {
+export function LeaderboardTabs({ active, period, language, difficulty }: { active: "class" | "school" | "classes"; period: Period; language: LanguageFilter; difficulty: DifficultyFilter }) {
   const { t } = useI18n();
   const typeLabels = { class: t("leaderboard.myClass"), school: t("leaderboard.school"), classes: t("leaderboard.classes") };
   const periodLabels = { today: t("leaderboard.today"), week: t("leaderboard.week"), month: t("leaderboard.month"), all: t("leaderboard.allTime") };
@@ -16,17 +16,22 @@ export function LeaderboardTabs({ active, period, language }: { active: "class" 
           ["school", typeLabels.school],
           ["classes", typeLabels.classes],
         ].map(([key, label]) => (
-          <Link key={key} href={`/leaderboard/${key}?period=${period}&language=${language}`} className={key === active ? "test-option test-option-active" : "test-option"}>{label}</Link>
+          <Link key={key} href={`/leaderboard/${key}?period=${period}&language=${language}&difficulty=${difficulty}`} className={key === active ? "test-option test-option-active" : "test-option"}>{label}</Link>
         ))}
       </nav>
       <nav className="flex gap-1 overflow-x-auto" aria-label="Leaderboard period">
         {(["today", "week", "month", "all"] as Period[]).map((value) => (
-          <Link key={value} href={`/leaderboard/${active}?period=${value}&language=${language}`} className={value === period ? "test-option test-option-active" : "test-option"}>{periodLabels[value]}</Link>
+          <Link key={value} href={`/leaderboard/${active}?period=${value}&language=${language}&difficulty=${difficulty}`} className={value === period ? "test-option test-option-active" : "test-option"}>{periodLabels[value]}</Link>
         ))}
       </nav>
       <nav className="flex gap-1 overflow-x-auto" aria-label="Leaderboard language">
         {(["all", "ru", "en"] as LanguageFilter[]).map((value) => (
-          <Link key={value} href={`/leaderboard/${active}?period=${period}&language=${value}`} className={value === language ? "test-option test-option-active" : "test-option"}>{value === "all" ? t("leaderboard.allLanguages") : value.toUpperCase()}</Link>
+          <Link key={value} href={`/leaderboard/${active}?period=${period}&language=${value}&difficulty=${difficulty}`} className={value === language ? "test-option test-option-active" : "test-option"}>{value === "all" ? t("leaderboard.allLanguages") : value.toUpperCase()}</Link>
+        ))}
+      </nav>
+      <nav className="flex gap-1 overflow-x-auto" aria-label="Leaderboard difficulty">
+        {(["easy", "medium"] as DifficultyFilter[]).map((value) => (
+          <Link key={value} href={`/leaderboard/${active}?period=${period}&language=${language}&difficulty=${value}`} className={value === difficulty ? "test-option test-option-active" : "test-option"}>{t(`difficulty.${value}`)}</Link>
         ))}
       </nav>
     </div>

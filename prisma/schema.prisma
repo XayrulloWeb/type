@@ -20,6 +20,7 @@ model User {
   isActive           Boolean   @default(true)
   archivedAt         DateTime?
   mustChangePassword Boolean   @default(false)
+  initialWpm         Int?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -52,6 +53,7 @@ model TestResult {
   user            User     @relation(fields: [userId], references: [id])
   mode            String // "time" or "words"
   language        String // "ru", "uz", "en"
+  difficulty      String   @default("easy") // "easy" or "medium"
   duration        Int // in seconds
   wordsCount      Int?
   wpm             Int
@@ -78,6 +80,7 @@ model TestResult {
   assignmentResults AssignmentResult[]
 
   @@index([userId, isRanked, wpm])
+  @@index([difficulty, language, isRanked, wpm])
   @@index([userId, createdAt])
   @@index([isRanked, createdAt])
   @@index([reviewStatus])

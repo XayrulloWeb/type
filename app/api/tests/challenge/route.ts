@@ -2,10 +2,11 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { createTestChallenge, type TestLanguage, type TestMode } from "@/lib/test-challenge";
+import { createTestChallenge, type TestDifficulty, type TestLanguage, type TestMode } from "@/lib/test-challenge";
 
 const MODES = new Set<TestMode>(["time", "words", "text"]);
 const LANGUAGES = new Set<TestLanguage>(["en", "ru"]);
+const DIFFICULTIES = new Set<TestDifficulty>(["easy", "medium"]);
 const DURATIONS = new Set([15, 30, 60, 120]);
 const WORD_COUNTS = new Set([10, 25, 50, 100]);
 
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       mode: "text",
       language: assignment.text.language as TestLanguage,
+      difficulty: normalizeTextDifficulty(assignment.text.difficulty),
       expectedText: assignment.text.content,
       assignmentId,
     }));
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       mode: "text",
       language: text.language as TestLanguage,
+      difficulty: normalizeTextDifficulty(text.difficulty),
       expectedText: text.content,
       textId,
     }));
@@ -57,16 +60,23 @@ export async function POST(request: Request) {
 
   const modeValue = typeof body.mode === "string" ? body.mode : "";
   const languageValue = typeof body.language === "string" ? body.language : "";
+  const difficultyValue = typeof body.difficulty === "string" ? body.difficulty : "easy";
   const selectedDuration = typeof body.selectedDuration === "number" ? body.selectedDuration : undefined;
   const wordsCount = typeof body.wordsCount === "number" ? body.wordsCount : undefined;
   if (
     !MODES.has(modeValue as TestMode) ||
     !LANGUAGES.has(languageValue as TestLanguage) ||
+    !DIFFICULTIES.has(difficultyValue as TestDifficulty) ||
     (modeValue === "time" && (!selectedDuration || !DURATIONS.has(selectedDuration))) ||
     (modeValue === "words" && (!wordsCount || !WORD_COUNTS.has(wordsCount)))
   ) return NextResponse.json({ error: "Invalid challenge request." }, { status: 400 });
 
   const mode = modeValue as TestMode;
   const language = languageValue as TestLanguage;
-  return NextResponse.json(createTestChallenge({ userId: session.user.id, mode, language, selectedDuration, wordsCount }));
+  const difficulty = difficultyValue as TestDifficulty;
+  return NextResponse.json(createTestChallenge({ userId: session.user.id, mode, language, difficulty, selectedDuration, wordsCount }));
+}
+
+function normalizeTextDifficulty(value: string): TestDifficulty {
+  return value === "easy" ? "easy" : "medium";
 }

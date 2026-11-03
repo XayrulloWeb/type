@@ -8,6 +8,12 @@ function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function optionalWpm(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 300 ? parsed : undefined;
+}
+
 export async function PATCH(request: Request, context: RouteContext<"/api/admin/students/[id]">) {
   const session = await requireSuperAdmin();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,7 +55,8 @@ export async function PATCH(request: Request, context: RouteContext<"/api/admin/
   const lastName = clean(body.lastName);
   const username = clean(body.username).toLowerCase();
   const className = clean(body.className).toUpperCase();
-  if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !/^[a-z0-9._-]{3,40}$/.test(username) || !className) {
+  const initialWpm = optionalWpm(body.initialWpm);
+  if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !/^[a-z0-9._-]{3,40}$/.test(username) || !className || initialWpm === undefined) {
     return NextResponse.json({ error: "Fill in the name, username and class correctly." }, { status: 400 });
   }
   const [schoolClass, usernameOwner] = await Promise.all([
@@ -60,13 +67,13 @@ export async function PATCH(request: Request, context: RouteContext<"/api/admin/
   if (usernameOwner && usernameOwner.id !== id) return NextResponse.json({ error: "This username is already in use." }, { status: 409 });
 
   await prisma.$transaction([
-    prisma.user.update({ where: { id }, data: { firstName, lastName, username, classId: schoolClass.id } }),
+    prisma.user.update({ where: { id }, data: { firstName, lastName, username, classId: schoolClass.id, initialWpm } }),
     prisma.adminActivity.create({ data: adminActivity(session.user, {
       action: "student.updated",
       entityType: "student",
       entityId: id,
-      description: `Updated ${student.username}: ${firstName} ${lastName}, ${className}, ${username}.`,
-      metadata: { previousUsername: student.username, previousClass: student.class?.name ?? null },
+      description: `Updated ${student.username}: ${firstName} ${lastName}, ${className}, ${username}, initial WPM ${initialWpm ?? "not set"}.`,
+      metadata: { previousUsername: student.username, previousClass: student.class?.name ?? null, previousInitialWpm: student.initialWpm },
     }) }),
   ]);
   return NextResponse.json({ success: true });

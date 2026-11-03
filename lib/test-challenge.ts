@@ -6,6 +6,7 @@ import { prepareTypingText } from "@/lib/typing-text";
 
 export type TestMode = "time" | "words" | "text";
 export type TestLanguage = "en" | "ru";
+export type TestDifficulty = "easy" | "medium";
 
 export interface ChallengePayload {
   version: 1;
@@ -13,6 +14,7 @@ export interface ChallengePayload {
   clientAttemptId: string;
   mode: TestMode;
   language: TestLanguage;
+  difficulty: TestDifficulty;
   expectedText: string;
   selectedDuration?: number;
   wordsCount?: number;
@@ -27,6 +29,7 @@ export interface TestChallenge {
   expectedText: string;
   mode: TestMode;
   language: TestLanguage;
+  difficulty: TestDifficulty;
   selectedDuration?: number;
   wordsCount?: number;
 }
@@ -45,15 +48,17 @@ export function createTestChallenge(input: {
   userId: string;
   mode: TestMode;
   language: TestLanguage;
+  difficulty?: TestDifficulty;
   selectedDuration?: number;
   wordsCount?: number;
   expectedText?: string;
   assignmentId?: string;
   textId?: string;
 }): TestChallenge {
+  const difficulty = input.difficulty ?? "easy";
   const sourceText = input.expectedText ?? (input.mode === "text"
-    ? getPreparedText(input.language)
-    : getRandomWords(input.language, input.mode === "time" ? 260 : input.wordsCount ?? 25));
+    ? getPreparedText(input.language, undefined, difficulty)
+    : getRandomWords(input.language, input.mode === "time" ? 260 : input.wordsCount ?? 25, undefined, difficulty));
   const expectedText = prepareTypingText(sourceText);
   const payload: ChallengePayload = {
     version: 1,
@@ -61,6 +66,7 @@ export function createTestChallenge(input: {
     clientAttemptId: randomUUID(),
     mode: input.mode,
     language: input.language,
+    difficulty,
     expectedText,
     selectedDuration: input.mode === "time" ? input.selectedDuration : undefined,
     wordsCount: input.mode === "words" ? input.wordsCount : undefined,
@@ -75,6 +81,7 @@ export function createTestChallenge(input: {
     expectedText: payload.expectedText,
     mode: payload.mode,
     language: payload.language,
+    difficulty: payload.difficulty,
     selectedDuration: payload.selectedDuration,
     wordsCount: payload.wordsCount,
   };
@@ -96,12 +103,13 @@ export function verifyTestChallenge(token: string): ChallengePayload | null {
       !/^[0-9a-f-]{36}$/i.test(payload.clientAttemptId) ||
       !["time", "words", "text"].includes(payload.mode) ||
       !["en", "ru"].includes(payload.language) ||
+      !["easy", "medium"].includes(payload.difficulty ?? "easy") ||
       !payload.expectedText ||
       payload.expectedText.length > 3000 ||
       !Number.isFinite(payload.expiresAt) ||
       payload.expiresAt < Date.now()
     ) return null;
-    return payload;
+    return { ...payload, difficulty: payload.difficulty ?? "easy" };
   } catch {
     return null;
   }

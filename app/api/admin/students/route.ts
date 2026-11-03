@@ -9,10 +9,17 @@ interface StudentRow {
   firstName?: unknown;
   lastName?: unknown;
   className?: unknown;
+  initialWpm?: unknown;
 }
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function optionalWpm(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 300 ? parsed : undefined;
 }
 
 export async function POST(request: Request) {
@@ -32,9 +39,10 @@ export async function POST(request: Request) {
     const firstName = clean(row.firstName);
     const lastName = clean(row.lastName);
     const className = clean(row.className).toUpperCase();
+    const initialWpm = optionalWpm(row.initialWpm);
     const schoolClass = classByName.get(className);
-    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !schoolClass) {
-      errors.push({ row: index + 1, message: !schoolClass ? `Class ${className || "is missing"} does not exist.` : "First and last name are required." });
+    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !schoolClass || initialWpm === undefined) {
+      errors.push({ row: index + 1, message: initialWpm === undefined ? "Initial WPM must be a whole number from 0 to 300." : !schoolClass ? `Class ${className || "is missing"} does not exist.` : "First and last name are required." });
       continue;
     }
 
@@ -51,6 +59,7 @@ export async function POST(request: Request) {
         passwordEncrypted: encryptPassword(temporaryPassword),
         role: "STUDENT",
         classId: schoolClass.id,
+        initialWpm,
         mustChangePassword: false,
         },
       });

@@ -16,6 +16,6 @@ export default async function LibraryTextPracticePage({ params }: { params: Prom
   ]);
   if (!student?.isActive || student.archivedAt || student.role !== "STUDENT") redirect("/login");
   if (!text?.isActive || !["en", "ru"].includes(text.language)) notFound();
-  const initialChallenge = createTestChallenge({ userId: session.user.id, mode: "text", language: text.language as "en" | "ru", expectedText: text.content, textId: text.id });
+  const initialChallenge = createTestChallenge({ userId: session.user.id, mode: "text", language: text.language as "en" | "ru", difficulty: text.difficulty === "easy" ? "easy" : "medium", expectedText: text.content, textId: text.id });
   return <TypingPractice user={session.user} initialChallenge={initialChallenge} libraryText={{ id: text.id, title: text.title, text: text.content, language: text.language as "en" | "ru" }} />;
 }
