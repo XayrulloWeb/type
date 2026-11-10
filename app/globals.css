@@ -361,6 +361,84 @@ button.data-card:hover {
   background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.1), transparent);
 }
 
+.defense-scan {
+  background:
+    repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgb(119 231 241 / 0.022) 4px),
+    linear-gradient(90deg, transparent, rgb(99 224 238 / 0.045), transparent);
+  background-size: auto, 45% 100%;
+  animation: defense-scan 8s linear infinite;
+}
+
+.defense-target {
+  will-change: top, left, transform;
+  animation: defense-target-in 180ms ease-out both;
+}
+
+.defense-target::before {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgb(114 239 250 / 0.07), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.defense-perimeter {
+  animation: defense-perimeter 1.8s ease-in-out infinite;
+}
+
+.defense-core {
+  animation: defense-core 2.4s ease-in-out infinite;
+}
+
+.defense-burst {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #8df4ff;
+  box-shadow:
+    0 0 0 8px rgb(141 244 255 / 0.16),
+    0 0 0 18px rgb(227 182 75 / 0.08),
+    0 0 25px 8px rgb(141 244 255 / 0.64);
+  transform: translate(-50%, -50%);
+  animation: defense-burst 460ms ease-out both;
+}
+
+.defense-countdown {
+  animation: defense-countdown 880ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes defense-scan {
+  from { background-position: 0 0, -60% 0; }
+  to { background-position: 0 20px, 160% 0; }
+}
+
+@keyframes defense-target-in {
+  from { opacity: 0; transform: translate(-50%, -0.65rem) scale(0.9); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes defense-perimeter {
+  0%, 100% { opacity: 0.52; }
+  50% { opacity: 1; }
+}
+
+@keyframes defense-core {
+  0%, 100% { transform: translateX(-50%) scale(0.96); filter: brightness(0.9); }
+  50% { transform: translateX(-50%) scale(1.04); filter: brightness(1.16); }
+}
+
+@keyframes defense-burst {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(0.4); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(2.8); }
+}
+
+@keyframes defense-countdown {
+  from { opacity: 0; transform: scale(1.65); }
+  45% { opacity: 1; }
+  to { opacity: 0.42; transform: scale(0.92); }
+}
+
 @media (min-width: 640px) {
   .page-shell {
     padding-inline: 2rem;

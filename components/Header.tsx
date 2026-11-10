@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "next-auth";
-import { BarChart3, BookOpenText, ChevronDown, ClipboardList, History, Keyboard, Sparkles, Trophy, UserRound } from "lucide-react";
+import { BarChart3, BookOpenText, ChevronDown, ClipboardList, Gamepad2, History, Keyboard, Sparkles, Trophy, UserRound } from "lucide-react";
 import clsx from "clsx";
 import { useState } from "react";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -18,6 +18,7 @@ export function Header({ user, hidden = false }: { user?: User; hidden?: boolean
 
   const navItems = [
     { href: "/typing", icon: Keyboard, label: t("nav.practice") },
+    { href: "/games", icon: Gamepad2, label: t("nav.games") },
     { href: "/texts", icon: BookOpenText, label: t("nav.texts") },
     { href: "/assignments", icon: ClipboardList, label: t("nav.assignments") },
     { href: "/olympiads", icon: Trophy, label: "Олимпиада" },

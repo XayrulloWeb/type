@@ -3,6 +3,7 @@ export type InterfaceLocale = "ru" | "uz";
 const ru: Record<string, string> = {
   "nav.practice": "Тренировка",
   "nav.texts": "Учебные тексты",
+  "nav.games": "Игры",
   "nav.assignments": "Задания",
   "nav.leaderboard": "Рейтинг",
   "nav.history": "История",
@@ -176,6 +177,7 @@ const ru: Record<string, string> = {
 const uz: Record<string, string> = {
   "nav.practice": "Mashq",
   "nav.texts": "O‘quv matnlari",
+  "nav.games": "O‘yinlar",
   "nav.assignments": "Topshiriqlar",
   "nav.leaderboard": "Reyting",
   "nav.history": "Tarix",
