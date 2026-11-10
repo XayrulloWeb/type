@@ -21,8 +21,8 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const difficulty: DefenseDifficulty = query.difficulty === "medium" || query.difficulty === "hard" ? query.difficulty : "easy";
   const [leaders, totalMissions, players] = await Promise.all([
     getDefenseLeaderboard(language, difficulty),
-    prisma.gameResult.count({ where: { game: "defense" } }),
-    prisma.gameResult.groupBy({ by: ["userId"], where: { game: "defense" } }),
+    prisma.gameResult.count({ where: { game: "defense", user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
+    prisma.gameResult.groupBy({ by: ["userId"], where: { game: "defense", user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
   ]);
 
   return <div className="min-h-screen"><Header user={session.user} /><main className="page-shell !max-w-[86rem]">
