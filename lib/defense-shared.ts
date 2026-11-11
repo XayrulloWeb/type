@@ -1,6 +1,6 @@
 export type DefenseLanguage = "ru" | "en";
 export type DefenseDifficulty = "easy" | "medium" | "hard";
-export type DefenseTargetKind = "normal" | "swift" | "armored" | "special";
+export type DefenseTargetKind = "normal" | "swift" | "armored" | "special" | "boss";
 export type DefensePowerup = "shield" | "freeze" | "double";
 
 export type DefenseEvent =
@@ -21,6 +21,10 @@ export interface DefenseSavedResult {
   duration: number;
   isRanked: boolean;
   grade: string;
+  bossesDestroyed: number;
+  rewardCredits: number;
+  stars: number;
+  medals: string[];
 }
 
 export const DEFENSE_CONFIG = {
@@ -42,6 +46,7 @@ export const DEFENSE_TARGETS = {
   swift: { label: "Быстрая", shortLabel: "БЫСТРАЯ", speedMultiplier: 1.55, scoreMultiplier: 1.25, breachDamage: 1 },
   armored: { label: "Бронированная", shortLabel: "БРОНЯ", speedMultiplier: 0.74, scoreMultiplier: 1.6, breachDamage: 2 },
   special: { label: "Особая", shortLabel: "ОСОБАЯ", speedMultiplier: 1.1, scoreMultiplier: 2, breachDamage: 1 },
+  boss: { label: "Командир", shortLabel: "КОМАНДИР", speedMultiplier: 0.42, scoreMultiplier: 4.5, breachDamage: 3 },
 } satisfies Record<DefenseTargetKind, { label: string; shortLabel: string; speedMultiplier: number; scoreMultiplier: number; breachDamage: number }>;
 
 const difficultyScoreMultiplier: Record<DefenseDifficulty, number> = { easy: 1, medium: 1.2, hard: 1.45 };
@@ -51,6 +56,9 @@ export function defenseWave(elapsedMs: number) {
 }
 
 export function defenseTargetKind(wordIndex: number, difficulty: DefenseDifficulty): DefenseTargetKind {
+  const bossCadence = difficulty === "easy" ? 12 : difficulty === "medium" ? 15 : 19;
+  if (wordIndex > 0 && (wordIndex + 1) % bossCadence === 0) return "boss";
+
   const unlocks = difficulty === "easy"
     ? { swift: 4, armored: 12, special: 24 }
     : difficulty === "medium"
@@ -65,6 +73,10 @@ export function defenseTargetKind(wordIndex: number, difficulty: DefenseDifficul
   if (wordIndex >= unlocks.armored && marker >= 3 && marker <= 6) return "armored";
   if (wordIndex >= unlocks.swift && marker >= 7 && marker <= 13) return "swift";
   return "normal";
+}
+
+export function defenseRequiredHits(word: string, targetKind: DefenseTargetKind) {
+  return Array.from(word).length * (targetKind === "boss" ? 3 : 1);
 }
 
 export function defensePowerupDrop(wordIndex: number): DefensePowerup | null {
@@ -86,4 +98,19 @@ export function defenseGrade(accuracy: number, maxCombo: number, destroyed: numb
   if (accuracy >= 85 && destroyed >= 15) return "B";
   if (accuracy >= 75 && destroyed >= 8) return "C";
   return "D";
+}
+
+export function defenseRewards({ accuracy, bossesDestroyed, destroyed, maxCombo, missed, score }: { accuracy: number; bossesDestroyed: number; destroyed: number; maxCombo: number; missed: number; score: number }) {
+  let stars = 1;
+  if (destroyed >= 12 && accuracy >= 82) stars = 2;
+  if (destroyed >= 24 && accuracy >= 92 && bossesDestroyed >= 2) stars = 3;
+
+  const medals: string[] = [];
+  if (bossesDestroyed >= 1) medals.push("Охотник на командиров");
+  if (destroyed >= 5 && missed === 0) medals.push("Идеальный периметр");
+  if (destroyed >= 5 && accuracy >= 95) medals.push("Точный стрелок");
+  if (maxCombo >= 20) medals.push("Мастер комбо");
+
+  const credits = Math.max(1, Math.min(9_999, Math.floor(score / 200) + bossesDestroyed * 12 + (stars - 1) * 5));
+  return { credits, medals, stars };
 }

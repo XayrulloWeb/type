@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyDefenseChallenge } from "@/lib/defense-challenge";
-import { DEFENSE_POWERUP_DURATION_MS, defenseGrade, defensePowerupDrop, defenseTargetKind, defenseWordScore, type DefenseEvent, type DefensePowerup } from "@/lib/defense-shared";
+import { DEFENSE_POWERUP_DURATION_MS, defenseGrade, defensePowerupDrop, defenseRequiredHits, defenseRewards, defenseTargetKind, defenseWordScore, type DefenseEvent, type DefensePowerup } from "@/lib/defense-shared";
 
 const MAX_EVENTS = 6_000;
 
@@ -29,7 +29,8 @@ export async function POST(request: Request) {
     const existing = await prisma.gameResult.findUnique({ where: { clientRunId: runId } });
     if (existing) {
       if (existing.userId !== session.user.id) return NextResponse.json({ error: "Invalid game result." }, { status: 400 });
-      return NextResponse.json({ ...existing, grade: defenseGrade(existing.accuracy, existing.maxCombo, existing.destroyed) });
+      const rewards = defenseRewards(existing);
+      return NextResponse.json({ ...existing, grade: defenseGrade(existing.accuracy, existing.maxCombo, existing.destroyed), stars: rewards.stars, medals: rewards.medals });
     }
 
     const processed = processEvents(events, challenge.words, challenge.difficulty, durationMs);
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     if (wpm > 600) return NextResponse.json({ error: "Invalid game speed." }, { status: 400 });
 
     const isRanked = user.role === "STUDENT" && duration >= 12 && processed.destroyed >= 5 && accuracy >= 70 && wpm <= 220;
+    const rewards = defenseRewards({ ...processed, accuracy });
     const result = await prisma.gameResult.create({
       data: {
         clientRunId: runId,
@@ -58,11 +60,13 @@ export async function POST(request: Request) {
         duration,
         correctChars: processed.correctChars,
         errorCount: processed.errorCount,
+        bossesDestroyed: processed.bossesDestroyed,
+        rewardCredits: rewards.credits,
         isRanked,
       },
     });
 
-    return NextResponse.json({ ...result, grade: defenseGrade(accuracy, processed.maxCombo, processed.destroyed) });
+    return NextResponse.json({ ...result, grade: defenseGrade(accuracy, processed.maxCombo, processed.destroyed), stars: rewards.stars, medals: rewards.medals });
   } catch (error) {
     console.error("Save defense result error:", error);
     return NextResponse.json({ error: "Could not save game result." }, { status: 500 });
@@ -80,6 +84,7 @@ function processEvents(rawEvents: unknown[], words: string[], difficulty: "easy"
   let combo = 0;
   let maxCombo = 0;
   let score = 0;
+  let bossesDestroyed = 0;
   const powerupCharges: Record<DefensePowerup, number> = { shield: 0, freeze: 0, double: 0 };
   const powerupActiveUntil: Record<DefensePowerup, number> = { shield: 0, freeze: 0, double: 0 };
 
@@ -107,24 +112,26 @@ function processEvents(rawEvents: unknown[], words: string[], difficulty: "easy"
     if (!Number.isInteger(event.wordIndex) || (event.wordIndex as number) < 0 || (event.wordIndex as number) >= words.length) return null;
     const wordIndex = event.wordIndex as number;
     if (resolved.has(wordIndex)) return null;
-    const wordLength = Array.from(words[wordIndex]).length;
+    const targetKind = defenseTargetKind(wordIndex, difficulty);
+    const requiredHits = defenseRequiredHits(words[wordIndex], targetKind);
 
     if (event.type === "hit") {
       const currentProgress = progress.get(wordIndex) ?? 0;
-      if (!Number.isInteger(event.charIndex) || event.charIndex !== currentProgress || currentProgress >= wordLength) return null;
+      if (!Number.isInteger(event.charIndex) || event.charIndex !== currentProgress || currentProgress >= requiredHits) return null;
       progress.set(wordIndex, currentProgress + 1);
       correctChars += 1;
       continue;
     }
 
     if (event.type === "destroyed") {
-      if ((progress.get(wordIndex) ?? 0) !== wordLength) return null;
+      if ((progress.get(wordIndex) ?? 0) !== requiredHits) return null;
       resolved.add(wordIndex);
       destroyed += 1;
       combo += 1;
       maxCombo = Math.max(maxCombo, combo);
       const scoreMultiplier = powerupActiveUntil.double > event.atMs ? 2 : 1;
-      score += defenseWordScore(words[wordIndex], difficulty, combo, defenseTargetKind(wordIndex, difficulty)) * scoreMultiplier;
+      score += defenseWordScore(words[wordIndex], difficulty, combo, targetKind) * scoreMultiplier;
+      if (targetKind === "boss") bossesDestroyed += 1;
       const powerup = defensePowerupDrop(wordIndex);
       if (powerup) powerupCharges[powerup] = Math.min(2, powerupCharges[powerup] + 1);
       continue;
@@ -141,5 +148,5 @@ function processEvents(rawEvents: unknown[], words: string[], difficulty: "easy"
   }
 
   if (destroyed + missed < 1) return null;
-  return { correctChars, errorCount, destroyed, missed, maxCombo, score };
+  return { correctChars, errorCount, destroyed, missed, maxCombo, score, bossesDestroyed };
 }

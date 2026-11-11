@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Building2, Crosshair, Expand, Gamepad2, Gem, Heart, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, Snowflake, Sparkles, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
+import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, Medal, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
 import clsx from "clsx";
 import {
   DEFENSE_CONFIG,
@@ -12,6 +12,8 @@ import {
   DEFENSE_WAVE_DURATION_MS,
   defenseGrade,
   defensePowerupDrop,
+  defenseRequiredHits,
+  defenseRewards,
   defenseTargetKind,
   defenseWave,
   defenseWordScore,
@@ -61,12 +63,14 @@ interface LiveStats {
   correctChars: number;
   errors: number;
   elapsedMs: number;
+  bossesDestroyed: number;
 }
 
 interface Burst {
   id: number;
   x: number;
   y: number;
+  kind: DefenseTargetKind;
 }
 
 type PowerupCharges = Record<DefensePowerup, number>;
@@ -144,6 +148,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const [powerups, setPowerupsState] = useState<PowerupCharges>(emptyPowerupCharges);
   const [activePowerups, setActivePowerupsState] = useState<ActivePowerups>(emptyActivePowerups);
   const [powerupToast, setPowerupToast] = useState<DefensePowerup | null>(null);
+  const [bossWarning, setBossWarning] = useState<string | null>(null);
+  const [bossImpact, setBossImpact] = useState(false);
 
   const phaseRef = useRef<Phase>("setup");
   const challengeRef = useRef<DefenseChallenge | null>(null);
@@ -161,6 +167,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const powerupsRef = useRef<PowerupCharges>(emptyPowerupCharges());
   const activePowerupsRef = useRef<ActivePowerups>(emptyActivePowerups());
   const powerupToastTimerRef = useRef<number | null>(null);
+  const bossWarningTimerRef = useRef<number | null>(null);
+  const bossImpactTimerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const saveDurationRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
@@ -200,6 +208,18 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     waveBannerTimerRef.current = window.setTimeout(() => setWaveBanner(null), 2_100);
   }, []);
 
+  const announceBoss = useCallback((word: string) => {
+    setBossWarning(word);
+    if (bossWarningTimerRef.current !== null) window.clearTimeout(bossWarningTimerRef.current);
+    bossWarningTimerRef.current = window.setTimeout(() => setBossWarning(null), 2_400);
+  }, []);
+
+  const triggerBossImpact = useCallback(() => {
+    setBossImpact(true);
+    if (bossImpactTimerRef.current !== null) window.clearTimeout(bossImpactTimerRef.current);
+    bossImpactTimerRef.current = window.setTimeout(() => setBossImpact(false), 620);
+  }, []);
+
   const setPowerups = useCallback((next: PowerupCharges) => {
     powerupsRef.current = next;
     setPowerupsState(next);
@@ -213,6 +233,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   useEffect(() => () => {
     if (waveBannerTimerRef.current !== null) window.clearTimeout(waveBannerTimerRef.current);
     if (powerupToastTimerRef.current !== null) window.clearTimeout(powerupToastTimerRef.current);
+    if (bossWarningTimerRef.current !== null) window.clearTimeout(bossWarningTimerRef.current);
+    if (bossImpactTimerRef.current !== null) window.clearTimeout(bossImpactTimerRef.current);
   }, []);
 
   const stopAmbientMusic = useCallback(() => {
@@ -303,14 +325,16 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     return stopAmbientMusic;
   }, [musicEnabled, phaseState, startAmbientMusic, stopAmbientMusic]);
 
-  const playTone = useCallback((kind: "hit" | "destroy" | "error" | "breach" | "powerup") => {
+  const playTone = useCallback((kind: "hit" | "destroy" | "error" | "breach" | "powerup" | "boss") => {
     if (!soundEnabled) return;
     const context = audioRef.current ?? new AudioContext();
     audioRef.current = context;
     if (context.state === "suspended") void context.resume();
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    const settings = kind === "powerup"
+    const settings = kind === "boss"
+      ? { frequency: 92, duration: 0.48, volume: 0.075, type: "sawtooth" as OscillatorType }
+      : kind === "powerup"
       ? { frequency: 620, duration: 0.24, volume: 0.05, type: "sine" as OscillatorType }
       : kind === "hit"
       ? { frequency: 510, duration: 0.035, volume: 0.025, type: "sine" as OscillatorType }
@@ -321,7 +345,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
           : { frequency: 180, duration: 0.07, volume: 0.035, type: "square" as OscillatorType };
     oscillator.type = settings.type;
     oscillator.frequency.setValueAtTime(settings.frequency, context.currentTime);
-    if (kind === "destroy" || kind === "powerup") oscillator.frequency.exponentialRampToValueAtTime(kind === "powerup" ? 1_760 : 1_320, context.currentTime + settings.duration);
+    if (kind === "destroy" || kind === "powerup" || kind === "boss") oscillator.frequency.exponentialRampToValueAtTime(kind === "powerup" ? 1_760 : kind === "boss" ? 640 : 1_320, context.currentTime + settings.duration);
     gain.gain.setValueAtTime(settings.volume * effectsVolume, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + settings.duration);
     oscillator.connect(gain).connect(context.destination);
@@ -368,6 +392,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     } catch {
       const current = statsRef.current;
       const accuracy = liveAccuracy(current);
+      const rewards = defenseRewards({ ...current, accuracy });
       setResult({
         id: "local",
         score: current.score,
@@ -379,6 +404,10 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         duration: Math.max(1, Math.round(durationMs / 1000)),
         isRanked: false,
         grade: defenseGrade(accuracy, current.maxCombo, current.destroyed),
+        bossesDestroyed: current.bossesDestroyed,
+        rewardCredits: rewards.credits,
+        stars: rewards.stars,
+        medals: rewards.medals,
       });
       setSaveError(true);
       setPhase("result");
@@ -427,6 +456,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       setPowerups(emptyPowerupCharges());
       setActivePowerups(emptyActivePowerups());
       setPowerupToast(null);
+      setBossWarning(null);
+      setBossImpact(false);
       const nextStats = emptyStats(difficulty);
       statsRef.current = nextStats;
       setStatsState(nextStats);
@@ -493,6 +524,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
           const damage = shieldActive ? 0 : DEFENSE_TARGETS[target.kind].breachDamage;
           setCombatLog((items) => [shieldActive ? `ЩИТ ПОГЛОТИЛ · ${target.word.toUpperCase()}` : `ПРОРЫВ · ${target.word.toUpperCase()} · -${damage}`, ...items].slice(0, 5));
           if (activeIdRef.current === target.id) setActiveId(null);
+          if (target.kind === "boss") triggerBossImpact();
         }
         playTone(shieldActive ? "powerup" : "breach");
         const breachDamage = shieldActive ? 0 : breached.reduce((total, target) => total + DEFENSE_TARGETS[target.kind].breachDamage, 0);
@@ -510,7 +542,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         const kind = defenseTargetKind(wordIndex, difficulty);
         const targetProfile = DEFENSE_TARGETS[kind];
         const lane = wordIndex % 6;
-        const x = 7 + lane * 12.8 + (wordIndex * 17 % 6);
+        const x = kind === "boss" ? 50 : 7 + lane * 12.8 + (wordIndex * 17 % 6);
         nextTargets = [...nextTargets, {
           id: targetIdRef.current++,
           wordIndex,
@@ -523,6 +555,11 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         }];
         wordCursorRef.current += 1;
         lastSpawnAtRef.current = elapsedMs;
+        if (kind === "boss") {
+          announceBoss(challenge.words[wordIndex]);
+          setCombatLog((items) => [`ВНИМАНИЕ · КОМАНДИР ${challenge.words[wordIndex].toUpperCase()}`, ...items].slice(0, 5));
+          playTone("boss");
+        }
       }
 
       setTargets(nextTargets);
@@ -539,7 +576,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [announceWave, challenge, difficulty, finishMission, phaseState, playTone, setActiveId, setTargets, setWave, updateStats]);
+  }, [announceBoss, announceWave, challenge, difficulty, finishMission, phaseState, playTone, setActiveId, setTargets, setWave, triggerBossImpact, updateStats]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -597,7 +634,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       }
 
       const letters = Array.from(target.word);
-      if (letters[target.progress] !== event.key) {
+      const expectedIndex = target.progress % letters.length;
+      if (letters[expectedIndex] !== event.key) {
         registerError();
         return;
       }
@@ -605,9 +643,10 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       const atMs = Math.round(elapsedMsRef.current);
       eventsRef.current.push({ type: "hit", wordIndex: target.wordIndex, charIndex: target.progress, atMs });
       const nextProgress = target.progress + 1;
+      const requiredHits = defenseRequiredHits(target.word, target.kind);
       playTone("hit");
 
-      if (nextProgress < letters.length) {
+      if (nextProgress < requiredHits) {
         setTargets(targetsRef.current.map((item) => item.id === target!.id ? { ...item, progress: nextProgress } : item));
         updateStats((current) => ({ ...current, correctChars: current.correctChars + 1 }));
         return;
@@ -625,25 +664,27 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
           ...current,
           correctChars: current.correctChars + 1,
           destroyed: current.destroyed + 1,
+          bossesDestroyed: current.bossesDestroyed + (completedTarget.kind === "boss" ? 1 : 0),
           combo,
           maxCombo: Math.max(current.maxCombo, combo),
           score: current.score + defenseWordScore(completedTarget.word, difficulty, combo, completedTarget.kind) * (doubleScoreActive ? 2 : 1),
         };
       });
       const burstId = burstIdRef.current++;
-      setBursts((items) => [...items, { id: burstId, x: completedTarget.x, y: completedTarget.y }]);
+      setBursts((items) => [...items, { id: burstId, x: completedTarget.x, y: completedTarget.y, kind: completedTarget.kind }]);
       window.setTimeout(() => setBursts((items) => items.filter((item) => item.id !== burstId)), 620);
       const powerupDrop = defensePowerupDrop(completedTarget.wordIndex);
       if (powerupDrop) grantPowerup(powerupDrop);
       const targetLabel = completedTarget.kind === "normal" ? "" : ` · ${DEFENSE_TARGETS[completedTarget.kind].shortLabel}`;
       const scoreLabel = doubleScoreActive ? " · ОЧКИ x2" : "";
       setCombatLog((items) => [`УНИЧТОЖЕНО · ${completedTarget.word.toUpperCase()}${targetLabel}${scoreLabel} · x${next.combo}`, ...items].slice(0, 5));
-      playTone("destroy");
+      if (completedTarget.kind === "boss") triggerBossImpact();
+      playTone(completedTarget.kind === "boss" ? "boss" : "destroy");
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activatePowerup, difficulty, grantPowerup, playTone, setActiveId, setPhase, setTargets, startMission, updateStats]);
+  }, [activatePowerup, difficulty, grantPowerup, playTone, setActiveId, setPhase, setTargets, startMission, triggerBossImpact, updateStats]);
 
   useEffect(() => {
     const pauseOnBlur = () => {
@@ -675,7 +716,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   }
 
   return <main className="relative mx-auto w-full max-w-[1920px] overflow-hidden bg-[#050809]">
-    <section className="defense-arena relative h-[calc(100svh-65px)] min-h-[640px] overflow-hidden border-t border-white/[0.04]" aria-label="NOVA Defense game arena">
+    <section className={clsx("defense-arena relative h-[calc(100svh-65px)] min-h-[640px] overflow-hidden border-t border-white/[0.04]", bossImpact && "defense-boss-impact")} aria-label="NOVA Defense game arena">
       <div className="absolute inset-0 bg-cover bg-center transition-[background-image] duration-700" style={{ backgroundImage: `url(${arenaThemes[arena].image})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,transparent_0,rgba(3,7,8,0.05)_30%,rgba(3,7,8,0.58)_100%)]" />
       <div className="defense-scan absolute inset-0 opacity-25" />
@@ -698,18 +739,25 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         </svg>
 
         <div className="absolute inset-0 z-10">
-          {targets.map((target) => <div key={target.id} data-target-kind={target.kind} className={clsx("defense-target absolute -translate-x-1/2 rounded-lg border bg-[#071013]/88 px-3 py-2 font-mono text-sm font-semibold tracking-[0.08em] shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm", targetKindClass(target.kind), activeTarget?.id === target.id ? "border-cyan-200/80 shadow-[0_0_30px_rgba(83,221,235,0.34)]" : "border-white/12")} style={{ left: `${target.x}%`, top: `${target.y}%` }}>
-            {target.kind !== "normal" && <span className="mb-1 flex items-center gap-1 font-sans text-[7px] font-bold uppercase tracking-[0.16em] opacity-80"><TargetKindIcon kind={target.kind} size={9} />{DEFENSE_TARGETS[target.kind].shortLabel}</span>}
-            <span className="whitespace-nowrap">{Array.from(target.word).map((character, index) => <span key={`${index}-${character}`} className={index < target.progress ? "text-nova-accent" : index === target.progress && activeTarget?.id === target.id ? "text-cyan-200 underline decoration-cyan-300/70 underline-offset-4" : "text-white/82"}>{character}</span>)}</span>
-          </div>)}
-          {bursts.map((burst) => <div key={burst.id} className="defense-burst absolute" style={{ left: `${burst.x}%`, top: `${burst.y}%` }} />)}
+          {targets.map((target) => {
+            const letters = Array.from(target.word);
+            const typedInPhase = target.progress % letters.length;
+            const completedBossPhases = target.kind === "boss" ? Math.floor(target.progress / letters.length) : 0;
+            return <div key={target.id} data-target-kind={target.kind} data-boss-phases={target.kind === "boss" ? completedBossPhases : undefined} className={clsx("defense-target absolute -translate-x-1/2 rounded-lg border bg-[#071013]/88 px-3 py-2 font-mono text-sm font-semibold tracking-[0.08em] shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm", targetKindClass(target.kind), activeTarget?.id === target.id ? "border-cyan-200/80 shadow-[0_0_30px_rgba(83,221,235,0.34)]" : "border-white/12")} style={{ left: `${target.x}%`, top: `${target.y}%` }}>
+              {target.kind !== "normal" && <span className="mb-1 flex items-center gap-1 font-sans text-[7px] font-bold uppercase tracking-[0.16em] opacity-80"><TargetKindIcon kind={target.kind} size={target.kind === "boss" ? 11 : 9} />{DEFENSE_TARGETS[target.kind].shortLabel}</span>}
+              {target.kind === "boss" && <span className="defense-boss-health mb-2 grid grid-cols-3 gap-1">{[0, 1, 2].map((phase) => <span key={phase} className={phase < completedBossPhases ? "defense-boss-health-complete" : phase === completedBossPhases ? "defense-boss-health-active" : ""} />)}</span>}
+              <span className="whitespace-nowrap">{letters.map((character, index) => <span key={`${index}-${character}`} className={index < typedInPhase ? "text-nova-accent" : index === typedInPhase && activeTarget?.id === target.id ? "text-cyan-200 underline decoration-cyan-300/70 underline-offset-4" : "text-white/82"}>{character}</span>)}</span>
+              {target.kind === "boss" && <span className="mt-2 block font-sans text-[7px] uppercase tracking-[0.18em] text-white/38">Щит {Math.min(3, completedBossPhases + 1)} / 3</span>}
+            </div>;
+          })}
+          {bursts.map((burst) => <div key={burst.id} className={clsx("defense-burst absolute", `defense-burst-${burst.kind}`)} style={{ left: `${burst.x}%`, top: `${burst.y}%` }} />)}
         </div>
 
         <div className="absolute inset-x-0 top-[82%] z-10"><div className="defense-perimeter h-px bg-red-400/75 shadow-[0_0_18px_rgba(248,113,113,0.8)]" /><div className="absolute right-4 top-2 text-[8px] font-bold uppercase tracking-[0.22em] text-red-300/75 sm:right-8">Critical perimeter · breach</div></div>
         {powerupRemaining.shield > 0 && <div className="defense-shield-field pointer-events-none absolute bottom-[-1.8rem] left-1/2 z-10 h-36 w-72 -translate-x-1/2 rounded-[50%] border border-cyan-200/45 bg-cyan-200/[0.035]" />}
         <div className="defense-core absolute bottom-[1.2%] left-1/2 z-10 h-16 w-16 -translate-x-1/2 rounded-full border border-nova-accent/55 bg-nova-accent/15 shadow-[0_0_35px_rgba(227,182,75,0.42)]"><div className="absolute inset-3 rounded-full border border-cyan-300/45 bg-[#071113] shadow-[inset_0_0_16px_rgba(83,221,235,0.35)]" /><div className="absolute inset-[1.35rem] rounded-full bg-nova-accent shadow-[0_0_20px_rgba(227,182,75,0.9)]" /></div>
 
-        <aside className="absolute bottom-24 right-5 z-20 hidden w-64 rounded-2xl border border-white/[0.08] bg-[#071012]/72 p-4 shadow-2xl backdrop-blur-xl xl:block"><div className="flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Combat log</span><Crosshair size={14} className="text-cyan-300" /></div><div className="mt-3 grid grid-cols-2 gap-2"><MiniMetric label="Уничтожено" value={stats.destroyed} /><MiniMetric label="Макс. комбо" value={`x${stats.maxCombo}`} /></div><div className="mt-3 grid grid-cols-3 gap-1 border-t border-white/[0.06] pt-3"><TargetLegend kind="swift" /><TargetLegend kind="armored" /><TargetLegend kind="special" /></div><div className="mt-3 space-y-2 border-t border-white/[0.06] pt-3">{combatLog.map((item, index) => <div key={`${item}-${index}`} className={index === 0 ? "font-mono text-[9px] text-cyan-200" : "font-mono text-[9px] text-white/32"}>{item}</div>)}{combatLog.length === 0 && <div className="font-mono text-[9px] text-white/25">Ожидание первой цели...</div>}</div></aside>
+        <aside className="absolute bottom-24 right-5 z-20 hidden w-64 rounded-2xl border border-white/[0.08] bg-[#071012]/72 p-4 shadow-2xl backdrop-blur-xl xl:block"><div className="flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Combat log</span><Crosshair size={14} className="text-cyan-300" /></div><div className="mt-3 grid grid-cols-2 gap-2"><MiniMetric label="Уничтожено" value={stats.destroyed} /><MiniMetric label="Командиры" value={stats.bossesDestroyed} /></div><div className="mt-3 grid grid-cols-4 gap-1 border-t border-white/[0.06] pt-3"><TargetLegend kind="swift" /><TargetLegend kind="armored" /><TargetLegend kind="special" /><TargetLegend kind="boss" /></div><div className="mt-3 space-y-2 border-t border-white/[0.06] pt-3">{combatLog.map((item, index) => <div key={`${item}-${index}`} className={index === 0 ? "font-mono text-[9px] text-cyan-200" : "font-mono text-[9px] text-white/32"}>{item}</div>)}{combatLog.length === 0 && <div className="font-mono text-[9px] text-white/25">Ожидание первой цели...</div>}</div></aside>
 
         <div className="absolute bottom-[5.25rem] left-1/2 z-20 grid w-[min(29rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-3 gap-2"><PowerupButton powerup="shield" charges={powerups.shield} remaining={powerupRemaining.shield} onActivate={activatePowerup} /><PowerupButton powerup="freeze" charges={powerups.freeze} remaining={powerupRemaining.freeze} onActivate={activatePowerup} /><PowerupButton powerup="double" charges={powerups.double} remaining={powerupRemaining.double} onActivate={activatePowerup} /></div>
 
@@ -718,6 +766,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       </>}
 
       {waveBanner && phaseState === "playing" && <div className="defense-wave-banner pointer-events-none absolute left-1/2 top-28 z-30 -translate-x-1/2 text-center"><div className="text-[9px] font-bold uppercase tracking-[0.42em] text-cyan-200/65">Волна {waveBanner} / {DEFENSE_MAX_WAVES}</div><div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-white drop-shadow-[0_0_24px_rgba(83,221,235,0.42)]">{waveCopy[waveBanner - 1].title}</div><div className="mt-1 text-[10px] uppercase tracking-[0.15em] text-white/38">{waveCopy[waveBanner - 1].text}</div></div>}
+      {bossWarning && phaseState === "playing" && <div className="defense-boss-banner pointer-events-none absolute left-1/2 top-40 z-30 -translate-x-1/2 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-red-300/35 bg-red-400/10 text-red-200 shadow-[0_0_40px_rgba(248,113,113,0.28)]"><Crown size={23} /></div><div className="mt-3 text-[10px] font-bold uppercase tracking-[0.42em] text-red-200/75">Командир обнаружен</div><div className="mt-1 text-2xl font-semibold text-white">{bossWarning.toUpperCase()}</div><div className="mt-1 text-[9px] uppercase tracking-[0.18em] text-white/40">Снимите три слоя защиты</div></div>}
       {powerupToast && phaseState === "playing" && <div className="defense-powerup-toast pointer-events-none absolute left-1/2 top-52 z-30 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#071012]/88 px-5 py-3 text-center shadow-2xl backdrop-blur-xl"><div className="flex items-center justify-center gap-2 text-sm font-semibold text-white"><PowerupIcon powerup={powerupToast} size={16} />{powerupCopy[powerupToast].title} получен</div><div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-white/35">Нажмите {powerupCopy[powerupToast].hotkey} для активации</div></div>}
 
       {(phaseState === "setup" || phaseState === "loading") && <MissionSetup
@@ -743,7 +792,25 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       {phaseState === "countdown" && <div className="absolute inset-0 z-40 grid place-items-center bg-black/35 backdrop-blur-sm"><div className="text-center"><div className="defense-countdown text-8xl font-semibold text-nova-accent drop-shadow-[0_0_35px_rgba(227,182,75,0.6)]">{countdown}</div><div className="mt-4 text-xs font-bold uppercase tracking-[0.3em] text-white/45">Система активируется</div></div></div>}
       {phaseState === "paused" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/72 px-5 backdrop-blur-lg"><div className="text-center"><Pause className="mx-auto text-nova-accent" size={34} /><h2 className="mt-5 text-3xl font-semibold">Миссия приостановлена</h2><p className="mt-2 text-sm text-white/40">Цели остановлены. Нажмите пробел или продолжите кнопкой.</p><div className="mt-6 flex justify-center gap-3"><button className="nova-button" onClick={() => setPhase("playing")}><Play size={16} /> Продолжить</button><button className="nova-button-secondary" onClick={finishMission}>Завершить</button></div></div></div>}
       {phaseState === "saving" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/78 backdrop-blur-xl"><div className="text-center"><div className="mx-auto h-11 w-11 animate-spin rounded-full border-2 border-white/10 border-t-nova-accent" /><div className="mt-5 text-sm font-semibold">Формирование отчёта...</div><div className="mt-1 text-xs text-white/35">Результат сохраняется отдельно от обычных тестов</div></div></div>}
-      {phaseState === "result" && result && <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-[#020405]/78 px-5 py-8 backdrop-blur-xl"><div className="w-full max-w-3xl rounded-[2rem] border border-white/[0.1] bg-[#081012]/92 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.68)] sm:p-9"><div className="text-center"><div className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-300">Mission report</div><h2 className="mt-4 text-2xl font-semibold">Survival · {difficultyCopy[difficulty].title}</h2><div className="mx-auto mt-6 grid h-24 w-24 place-items-center rounded-full border border-cyan-300/35 bg-cyan-300/[0.06] text-5xl font-semibold text-cyan-200 shadow-[0_0_45px_rgba(83,221,235,0.13)]">{result.grade}</div></div><div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"><ResultMetric value={result.score.toLocaleString("ru-RU")} label="Очки" accent /><ResultMetric value={result.wpm} label="WPM" /><ResultMetric value={`${result.accuracy.toFixed(0)}%`} label="Точность" /><ResultMetric value={result.destroyed} label="Уничтожено" /><ResultMetric value={`x${result.maxCombo}`} label="Макс. комбо" /><ResultMetric value={formatTime(result.duration)} label="Время" /></div><div className="mt-5 text-center text-[10px] text-white/35">{adminMode ? "Результат администратора сохранён отдельно и не участвует в рейтинге." : result.isRanked ? "Результат добавлен в игровой рейтинг." : "Результат сохранён как тренировочный."}</div>{saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-center text-xs text-red-200">Сервер не подтвердил сохранение. <button className="font-semibold underline" onClick={retrySave}>Повторить</button></div>}<div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button className="nova-button !min-h-12" onClick={() => void startMission()}><RotateCcw size={16} /> Играть снова</button><Link href="/games" className="nova-button-secondary !min-h-12"><Trophy size={16} /> Игровой рейтинг</Link></div><div className="mt-4 text-center text-[9px] uppercase tracking-[0.16em] text-white/25">Enter или Tab — новая миссия</div></div></div>}
+      {phaseState === "result" && result && <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-[#020405]/78 px-5 py-8 backdrop-blur-xl">
+        <div className="w-full max-w-4xl rounded-[2rem] border border-white/[0.1] bg-[#081012]/92 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.68)] sm:p-9">
+          <div className="text-center">
+            <div className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-300">Mission report</div>
+            <h2 className="mt-4 text-2xl font-semibold">Survival · {difficultyCopy[difficulty].title}</h2>
+            <div className="mx-auto mt-5 grid h-24 w-24 place-items-center rounded-full border border-cyan-300/35 bg-cyan-300/[0.06] text-5xl font-semibold text-cyan-200 shadow-[0_0_45px_rgba(83,221,235,0.13)]">{result.grade}</div>
+            <div className="mt-4 flex justify-center gap-1.5" aria-label={`${result.stars} из 3 звёзд`}>{[1, 2, 3].map((star) => <Star key={star} size={19} className={star <= result.stars ? "fill-nova-accent text-nova-accent drop-shadow-[0_0_8px_rgba(227,182,75,0.48)]" : "text-white/12"} />)}</div>
+          </div>
+          <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"><ResultMetric value={result.score.toLocaleString("ru-RU")} label="Очки" accent /><ResultMetric value={result.wpm} label="WPM" /><ResultMetric value={`${result.accuracy.toFixed(0)}%`} label="Точность" /><ResultMetric value={result.destroyed} label="Уничтожено" /><ResultMetric value={`x${result.maxCombo}`} label="Макс. комбо" /><ResultMetric value={formatTime(result.duration)} label="Время" /></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
+            <div className="defense-reward-glow flex items-center justify-between rounded-2xl border border-nova-accent/20 bg-nova-accent/[0.055] p-4"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl border border-nova-accent/20 bg-nova-accent/10 text-nova-accent"><Coins size={21} /></span><span><span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-white/35">Награда миссии</span><span className="mt-1 block text-lg font-semibold text-white">+{result.rewardCredits} NOVA Credits</span></span></div><div className="text-right"><Crown className="ml-auto text-red-200/75" size={17} /><span className="mt-1 block text-xs font-semibold text-white/70">{result.bossesDestroyed} босс.</span></div></div>
+            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.022] p-4"><div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/35"><Medal size={14} className="text-cyan-200" /> Медали</div><div className="mt-3 flex flex-wrap gap-2">{result.medals.length ? result.medals.map((medal) => <span key={medal} className="rounded-full border border-cyan-300/15 bg-cyan-300/[0.055] px-3 py-1.5 text-[10px] font-semibold text-cyan-100/80">{medal}</span>) : <span className="text-[10px] text-white/28">Следующая медаль откроется после победы над командиром.</span>}</div></div>
+          </div>
+          <div className="mt-5 text-center text-[10px] text-white/35">{adminMode ? "Результат администратора сохранён отдельно и не участвует в рейтинге." : result.isRanked ? "Результат добавлен в игровой рейтинг." : "Результат сохранён как тренировочный."}</div>
+          {saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-center text-xs text-red-200">Сервер не подтвердил сохранение. <button className="font-semibold underline" onClick={retrySave}>Повторить</button></div>}
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button className="nova-button !min-h-12" onClick={() => void startMission()}><RotateCcw size={16} /> Играть снова</button><Link href="/games" className="nova-button-secondary !min-h-12"><Trophy size={16} /> Игровой рейтинг</Link></div>
+          <div className="mt-4 text-center text-[9px] uppercase tracking-[0.16em] text-white/25">Enter или Tab — новая миссия</div>
+        </div>
+      </div>}
     </section>
   </main>;
 }
@@ -795,12 +862,13 @@ function MissionSetup({
             <div className="mt-8 grid h-16 w-16 place-items-center rounded-2xl border border-nova-accent/25 bg-nova-accent/10 text-nova-accent shadow-[0_0_38px_rgba(227,182,75,0.13)]"><Shield size={29} /></div>
             <h1 className="mt-6 max-w-md text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl">Защита<br /><span className="text-nova-accent">периметра</span></h1>
             <p className="mt-4 max-w-md text-sm leading-6 text-white/48">Выберите арену и режим. Печатайте падающие цели, создавайте комбо и не позволяйте им пройти критическую линию.</p>
-            <div className="mt-8 grid gap-2 text-[11px] text-white/48 sm:grid-cols-3 lg:grid-cols-1">
+            <div className="mt-8 grid gap-2 text-[11px] text-white/48 sm:grid-cols-2 lg:grid-cols-1">
               <SetupFeature number="01" title="Шесть волн" text="Каждая волна быстрее предыдущей" />
-              <SetupFeature number="02" title="Четыре типа целей" text="Быстрые, броня и особые сигнатуры" />
+              <SetupFeature number="02" title="Командиры" text="Три слоя защиты и усиленная награда" />
               <SetupFeature number="03" title="Три боевых бонуса" text="Щит, заморозка и двойные очки" />
+              <SetupFeature number="04" title="Награды" text="Звёзды, медали и NOVA Credits" />
             </div>
-            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.3</div>
+            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.4</div>
           </div>
         </section>
 
@@ -850,6 +918,7 @@ function targetKindClass(kind: DefenseTargetKind) {
   if (kind === "swift") return "defense-target-swift !border-amber-300/35 text-amber-200";
   if (kind === "armored") return "defense-target-armored !border-sky-300/40 text-sky-200";
   if (kind === "special") return "defense-target-special !border-fuchsia-300/45 text-fuchsia-200";
+  if (kind === "boss") return "defense-target-boss !border-red-300/55 text-red-100";
   return "";
 }
 
@@ -857,11 +926,12 @@ function TargetKindIcon({ kind, size = 10 }: { kind: DefenseTargetKind; size?: n
   if (kind === "swift") return <Zap size={size} />;
   if (kind === "armored") return <ShieldCheck size={size} />;
   if (kind === "special") return <Gem size={size} />;
+  if (kind === "boss") return <Crown size={size} />;
   return <Crosshair size={size} />;
 }
 
 function TargetLegend({ kind }: { kind: Exclude<DefenseTargetKind, "normal"> }) {
-  return <div className={clsx("rounded-lg border px-1.5 py-2 text-center", kind === "swift" ? "border-amber-300/15 bg-amber-300/[0.05] text-amber-200" : kind === "armored" ? "border-sky-300/15 bg-sky-300/[0.05] text-sky-200" : "border-fuchsia-300/15 bg-fuchsia-300/[0.05] text-fuchsia-200")}><span className="flex justify-center"><TargetKindIcon kind={kind} size={11} /></span><span className="mt-1 block text-[6px] font-bold uppercase tracking-wider">{DEFENSE_TARGETS[kind].shortLabel}</span></div>;
+  return <div className={clsx("rounded-lg border px-1 py-2 text-center", kind === "swift" ? "border-amber-300/15 bg-amber-300/[0.05] text-amber-200" : kind === "armored" ? "border-sky-300/15 bg-sky-300/[0.05] text-sky-200" : kind === "special" ? "border-fuchsia-300/15 bg-fuchsia-300/[0.05] text-fuchsia-200" : "border-red-300/15 bg-red-300/[0.05] text-red-200")}><span className="flex justify-center"><TargetKindIcon kind={kind} size={11} /></span><span className="mt-1 block text-[5px] font-bold uppercase tracking-wider">{DEFENSE_TARGETS[kind].shortLabel}</span></div>;
 }
 
 function PowerupIcon({ powerup, size = 15 }: { powerup: DefensePowerup; size?: number }) {
@@ -885,7 +955,7 @@ function AudioControl({ icon, title, enabled, volume, onEnabledChange, onVolumeC
 }
 
 function emptyStats(difficulty: DefenseDifficulty): LiveStats {
-  return { score: 0, lives: DEFENSE_CONFIG[difficulty].lives, combo: 0, maxCombo: 0, destroyed: 0, missed: 0, correctChars: 0, errors: 0, elapsedMs: 0 };
+  return { score: 0, lives: DEFENSE_CONFIG[difficulty].lives, combo: 0, maxCombo: 0, destroyed: 0, missed: 0, correctChars: 0, errors: 0, elapsedMs: 0, bossesDestroyed: 0 };
 }
 
 function emptyPowerupCharges(): PowerupCharges {
