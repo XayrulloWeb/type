@@ -1,11 +1,13 @@
 export type DefenseLanguage = "ru" | "en";
 export type DefenseDifficulty = "easy" | "medium" | "hard";
 export type DefenseTargetKind = "normal" | "swift" | "armored" | "special";
+export type DefensePowerup = "shield" | "freeze" | "double";
 
 export type DefenseEvent =
   | { type: "hit"; wordIndex: number; charIndex: number; atMs: number }
   | { type: "destroyed"; wordIndex: number; atMs: number }
   | { type: "missed"; wordIndex: number; atMs: number }
+  | { type: "powerup"; powerup: DefensePowerup; atMs: number }
   | { type: "error"; atMs: number };
 
 export interface DefenseSavedResult {
@@ -29,6 +31,11 @@ export const DEFENSE_CONFIG = {
 
 export const DEFENSE_WAVE_DURATION_MS = 30_000;
 export const DEFENSE_MAX_WAVES = 6;
+export const DEFENSE_POWERUP_DURATION_MS = {
+  shield: 8_000,
+  freeze: 5_000,
+  double: 10_000,
+} satisfies Record<DefensePowerup, number>;
 
 export const DEFENSE_TARGETS = {
   normal: { label: "Обычная", shortLabel: "СТАНДАРТ", speedMultiplier: 1, scoreMultiplier: 1, breachDamage: 1 },
@@ -58,6 +65,14 @@ export function defenseTargetKind(wordIndex: number, difficulty: DefenseDifficul
   if (wordIndex >= unlocks.armored && marker >= 3 && marker <= 6) return "armored";
   if (wordIndex >= unlocks.swift && marker >= 7 && marker <= 13) return "swift";
   return "normal";
+}
+
+export function defensePowerupDrop(wordIndex: number): DefensePowerup | null {
+  const slot = wordIndex % 15;
+  if (slot === 4) return "shield";
+  if (slot === 9) return "freeze";
+  if (slot === 14) return "double";
+  return null;
 }
 
 export function defenseWordScore(word: string, difficulty: DefenseDifficulty, combo: number, targetKind: DefenseTargetKind = "normal") {

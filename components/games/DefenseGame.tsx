@@ -7,15 +7,18 @@ import clsx from "clsx";
 import {
   DEFENSE_CONFIG,
   DEFENSE_MAX_WAVES,
+  DEFENSE_POWERUP_DURATION_MS,
   DEFENSE_TARGETS,
   DEFENSE_WAVE_DURATION_MS,
   defenseGrade,
+  defensePowerupDrop,
   defenseTargetKind,
   defenseWave,
   defenseWordScore,
   type DefenseDifficulty,
   type DefenseEvent,
   type DefenseLanguage,
+  type DefensePowerup,
   type DefenseSavedResult,
   type DefenseTargetKind,
 } from "@/lib/defense-shared";
@@ -66,6 +69,9 @@ interface Burst {
   y: number;
 }
 
+type PowerupCharges = Record<DefensePowerup, number>;
+type ActivePowerups = Record<`${DefensePowerup}Until`, number>;
+
 const difficultyCopy: Record<DefenseDifficulty, { title: string; text: string }> = {
   easy: { title: "Easy", text: "Медленный темп · 4 жизни" },
   medium: { title: "Medium", text: "Больше целей · 3 жизни" },
@@ -80,6 +86,12 @@ const waveCopy = [
   { title: "Критический шторм", text: "Плотность целей максимальна" },
   { title: "Последний рубеж", text: "Финальная волна" },
 ] as const;
+
+const powerupCopy: Record<DefensePowerup, { title: string; text: string; hotkey: string }> = {
+  shield: { title: "Щит", text: "8 сек. без урона", hotkey: "1" },
+  freeze: { title: "Заморозка", text: "5 сек. остановки", hotkey: "2" },
+  double: { title: "x2 очки", text: "10 сек. двойных очков", hotkey: "3" },
+};
 
 const arenaThemes: Record<ArenaTheme, { title: string; subtitle: string; image: string; icon: typeof Sparkles; frequencies: number[] }> = {
   nova: {
@@ -129,6 +141,9 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const [combatLog, setCombatLog] = useState<string[]>([]);
   const [wave, setWaveState] = useState(1);
   const [waveBanner, setWaveBanner] = useState<number | null>(null);
+  const [powerups, setPowerupsState] = useState<PowerupCharges>(emptyPowerupCharges);
+  const [activePowerups, setActivePowerupsState] = useState<ActivePowerups>(emptyActivePowerups);
+  const [powerupToast, setPowerupToast] = useState<DefensePowerup | null>(null);
 
   const phaseRef = useRef<Phase>("setup");
   const challengeRef = useRef<DefenseChallenge | null>(null);
@@ -143,6 +158,9 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const lastSpawnAtRef = useRef(0);
   const waveRef = useRef(1);
   const waveBannerTimerRef = useRef<number | null>(null);
+  const powerupsRef = useRef<PowerupCharges>(emptyPowerupCharges());
+  const activePowerupsRef = useRef<ActivePowerups>(emptyActivePowerups());
+  const powerupToastTimerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const saveDurationRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
@@ -182,8 +200,19 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     waveBannerTimerRef.current = window.setTimeout(() => setWaveBanner(null), 2_100);
   }, []);
 
+  const setPowerups = useCallback((next: PowerupCharges) => {
+    powerupsRef.current = next;
+    setPowerupsState(next);
+  }, []);
+
+  const setActivePowerups = useCallback((next: ActivePowerups) => {
+    activePowerupsRef.current = next;
+    setActivePowerupsState(next);
+  }, []);
+
   useEffect(() => () => {
     if (waveBannerTimerRef.current !== null) window.clearTimeout(waveBannerTimerRef.current);
+    if (powerupToastTimerRef.current !== null) window.clearTimeout(powerupToastTimerRef.current);
   }, []);
 
   const stopAmbientMusic = useCallback(() => {
@@ -274,14 +303,16 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     return stopAmbientMusic;
   }, [musicEnabled, phaseState, startAmbientMusic, stopAmbientMusic]);
 
-  const playTone = useCallback((kind: "hit" | "destroy" | "error" | "breach") => {
+  const playTone = useCallback((kind: "hit" | "destroy" | "error" | "breach" | "powerup") => {
     if (!soundEnabled) return;
     const context = audioRef.current ?? new AudioContext();
     audioRef.current = context;
     if (context.state === "suspended") void context.resume();
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    const settings = kind === "hit"
+    const settings = kind === "powerup"
+      ? { frequency: 620, duration: 0.24, volume: 0.05, type: "sine" as OscillatorType }
+      : kind === "hit"
       ? { frequency: 510, duration: 0.035, volume: 0.025, type: "sine" as OscillatorType }
       : kind === "destroy"
         ? { frequency: 860, duration: 0.11, volume: 0.045, type: "triangle" as OscillatorType }
@@ -290,13 +321,35 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
           : { frequency: 180, duration: 0.07, volume: 0.035, type: "square" as OscillatorType };
     oscillator.type = settings.type;
     oscillator.frequency.setValueAtTime(settings.frequency, context.currentTime);
-    if (kind === "destroy") oscillator.frequency.exponentialRampToValueAtTime(1_320, context.currentTime + settings.duration);
+    if (kind === "destroy" || kind === "powerup") oscillator.frequency.exponentialRampToValueAtTime(kind === "powerup" ? 1_760 : 1_320, context.currentTime + settings.duration);
     gain.gain.setValueAtTime(settings.volume * effectsVolume, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + settings.duration);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
     oscillator.stop(context.currentTime + settings.duration);
   }, [effectsVolume, soundEnabled]);
+
+  const grantPowerup = useCallback((powerup: DefensePowerup) => {
+    const next = { ...powerupsRef.current, [powerup]: Math.min(2, powerupsRef.current[powerup] + 1) };
+    setPowerups(next);
+    setPowerupToast(powerup);
+    if (powerupToastTimerRef.current !== null) window.clearTimeout(powerupToastTimerRef.current);
+    powerupToastTimerRef.current = window.setTimeout(() => setPowerupToast(null), 1_800);
+    setCombatLog((items) => [`БОНУС ПОЛУЧЕН · ${powerupCopy[powerup].title.toUpperCase()}`, ...items].slice(0, 5));
+    playTone("powerup");
+  }, [playTone, setPowerups]);
+
+  const activatePowerup = useCallback((powerup: DefensePowerup) => {
+    if (phaseRef.current !== "playing" || powerupsRef.current[powerup] < 1) return;
+    const now = Math.round(elapsedMsRef.current);
+    const untilKey = `${powerup}Until` as keyof ActivePowerups;
+    if (activePowerupsRef.current[untilKey] > now) return;
+    eventsRef.current.push({ type: "powerup", powerup, atMs: now });
+    setPowerups({ ...powerupsRef.current, [powerup]: powerupsRef.current[powerup] - 1 });
+    setActivePowerups({ ...activePowerupsRef.current, [untilKey]: now + DEFENSE_POWERUP_DURATION_MS[powerup] });
+    setCombatLog((items) => [`АКТИВИРОВАНО · ${powerupCopy[powerup].title.toUpperCase()}`, ...items].slice(0, 5));
+    playTone("powerup");
+  }, [playTone, setActivePowerups, setPowerups]);
 
   const saveMission = useCallback(async (durationMs: number) => {
     const currentChallenge = challengeRef.current;
@@ -371,6 +424,9 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       lastSpawnAtRef.current = -DEFENSE_CONFIG[difficulty].spawnMs;
       setWave(1);
       setWaveBanner(null);
+      setPowerups(emptyPowerupCharges());
+      setActivePowerups(emptyActivePowerups());
+      setPowerupToast(null);
       const nextStats = emptyStats(difficulty);
       statsRef.current = nextStats;
       setStatsState(nextStats);
@@ -383,7 +439,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       setPhase("setup");
       setSaveError(true);
     }
-  }, [difficulty, language, musicEnabled, setActiveId, setPhase, setWave, soundEnabled]);
+  }, [difficulty, language, musicEnabled, setActiveId, setActivePowerups, setPhase, setPowerups, setWave, soundEnabled]);
 
   useEffect(() => {
     if (phaseState !== "countdown") return;
@@ -424,7 +480,9 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         setCombatLog((items) => [`ВОЛНА ${currentWave} · ${waveCopy[currentWave - 1].title.toUpperCase()}`, ...items].slice(0, 5));
       }
       const speedMultiplier = 1 + Math.min(0.5, elapsedMs / 160_000) + (currentWave - 1) * 0.06;
-      let nextTargets = targetsRef.current.map((target) => ({ ...target, y: target.y + target.speed * speedMultiplier * deltaMs / 1000 }));
+      const freezeActive = activePowerupsRef.current.freezeUntil > elapsedMs;
+      const shieldActive = activePowerupsRef.current.shieldUntil > elapsedMs;
+      let nextTargets = targetsRef.current.map((target) => ({ ...target, y: target.y + (freezeActive ? 0 : target.speed * speedMultiplier * deltaMs / 1000) }));
       const breached = nextTargets.filter((target) => target.y >= 82);
 
       if (breached.length) {
@@ -432,12 +490,12 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         nextTargets = nextTargets.filter((target) => !breachedIds.has(target.id));
         for (const target of breached) {
           eventsRef.current.push({ type: "missed", wordIndex: target.wordIndex, atMs: Math.round(elapsedMs) });
-          const damage = DEFENSE_TARGETS[target.kind].breachDamage;
-          setCombatLog((items) => [`ПРОРЫВ · ${target.word.toUpperCase()} · -${damage}`, ...items].slice(0, 5));
+          const damage = shieldActive ? 0 : DEFENSE_TARGETS[target.kind].breachDamage;
+          setCombatLog((items) => [shieldActive ? `ЩИТ ПОГЛОТИЛ · ${target.word.toUpperCase()}` : `ПРОРЫВ · ${target.word.toUpperCase()} · -${damage}`, ...items].slice(0, 5));
           if (activeIdRef.current === target.id) setActiveId(null);
         }
-        playTone("breach");
-        const breachDamage = breached.reduce((total, target) => total + DEFENSE_TARGETS[target.kind].breachDamage, 0);
+        playTone(shieldActive ? "powerup" : "breach");
+        const breachDamage = shieldActive ? 0 : breached.reduce((total, target) => total + DEFENSE_TARGETS[target.kind].breachDamage, 0);
         const next = updateStats((current) => ({ ...current, lives: Math.max(0, current.lives - breachDamage), missed: current.missed + breached.length, combo: 0, elapsedMs }));
         setTargets(nextTargets);
         if (next.lives <= 0) {
@@ -447,7 +505,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       }
 
       const spawnEvery = config.spawnMs / (1 + (currentWave - 1) * 0.09);
-      if (elapsedMs - lastSpawnAtRef.current >= spawnEvery && nextTargets.length < config.maxTargets && wordCursorRef.current < challenge.words.length) {
+      if (!freezeActive && elapsedMs - lastSpawnAtRef.current >= spawnEvery && nextTargets.length < config.maxTargets && wordCursorRef.current < challenge.words.length) {
         const wordIndex = wordCursorRef.current;
         const kind = defenseTargetKind(wordIndex, difficulty);
         const targetProfile = DEFENSE_TARGETS[kind];
@@ -515,6 +573,12 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         void startMission();
         return;
       }
+      const powerupHotkey = event.key === "1" ? "shield" : event.key === "2" ? "freeze" : event.key === "3" ? "double" : null;
+      if (powerupHotkey) {
+        event.preventDefault();
+        activatePowerup(powerupHotkey);
+        return;
+      }
       if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return;
       event.preventDefault();
 
@@ -554,6 +618,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       const nextTargets = targetsRef.current.filter((item) => item.id !== completedTarget.id);
       setActiveId(null);
       setTargets(nextTargets);
+      const doubleScoreActive = activePowerupsRef.current.doubleUntil > atMs;
       const next = updateStats((current) => {
         const combo = current.combo + 1;
         return {
@@ -562,20 +627,23 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
           destroyed: current.destroyed + 1,
           combo,
           maxCombo: Math.max(current.maxCombo, combo),
-          score: current.score + defenseWordScore(completedTarget.word, difficulty, combo, completedTarget.kind),
+          score: current.score + defenseWordScore(completedTarget.word, difficulty, combo, completedTarget.kind) * (doubleScoreActive ? 2 : 1),
         };
       });
       const burstId = burstIdRef.current++;
       setBursts((items) => [...items, { id: burstId, x: completedTarget.x, y: completedTarget.y }]);
       window.setTimeout(() => setBursts((items) => items.filter((item) => item.id !== burstId)), 620);
+      const powerupDrop = defensePowerupDrop(completedTarget.wordIndex);
+      if (powerupDrop) grantPowerup(powerupDrop);
       const targetLabel = completedTarget.kind === "normal" ? "" : ` · ${DEFENSE_TARGETS[completedTarget.kind].shortLabel}`;
-      setCombatLog((items) => [`УНИЧТОЖЕНО · ${completedTarget.word.toUpperCase()}${targetLabel} · x${next.combo}`, ...items].slice(0, 5));
+      const scoreLabel = doubleScoreActive ? " · ОЧКИ x2" : "";
+      setCombatLog((items) => [`УНИЧТОЖЕНО · ${completedTarget.word.toUpperCase()}${targetLabel}${scoreLabel} · x${next.combo}`, ...items].slice(0, 5));
       playTone("destroy");
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [difficulty, playTone, setActiveId, setPhase, setTargets, startMission, updateStats]);
+  }, [activatePowerup, difficulty, grantPowerup, playTone, setActiveId, setPhase, setTargets, startMission, updateStats]);
 
   useEffect(() => {
     const pauseOnBlur = () => {
@@ -590,6 +658,11 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const wpm = liveWpm(stats);
   const speedMultiplier = 1 + Math.min(0.5, stats.elapsedMs / 160_000) + (wave - 1) * 0.06;
   const waveProgress = wave >= DEFENSE_MAX_WAVES ? Math.min(100, (stats.elapsedMs - (DEFENSE_MAX_WAVES - 1) * DEFENSE_WAVE_DURATION_MS) / DEFENSE_WAVE_DURATION_MS * 100) : stats.elapsedMs % DEFENSE_WAVE_DURATION_MS / DEFENSE_WAVE_DURATION_MS * 100;
+  const powerupRemaining: Record<DefensePowerup, number> = {
+    shield: Math.max(0, Math.ceil((activePowerups.shieldUntil - stats.elapsedMs) / 1_000)),
+    freeze: Math.max(0, Math.ceil((activePowerups.freezeUntil - stats.elapsedMs) / 1_000)),
+    double: Math.max(0, Math.ceil((activePowerups.doubleUntil - stats.elapsedMs) / 1_000)),
+  };
 
   async function toggleFullscreen() {
     if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
@@ -615,6 +688,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       </div>
 
       {(phaseState === "playing" || phaseState === "paused" || phaseState === "saving") && <>
+        {powerupRemaining.freeze > 0 && <div className="defense-freeze-overlay pointer-events-none absolute inset-0 z-[8] bg-cyan-300/[0.055]" />}
+        {powerupRemaining.double > 0 && <div className="defense-double-frame pointer-events-none absolute inset-2 z-[19] rounded-2xl border border-nova-accent/30" />}
         <div className="absolute left-4 top-[4.8rem] z-20 flex items-center gap-2 rounded-xl border border-white/[0.07] bg-black/35 px-3 py-2 backdrop-blur-md sm:left-6"><div className="flex gap-1">{Array.from({ length: DEFENSE_CONFIG[difficulty].lives }, (_, index) => <Heart key={index} size={15} className={index < stats.lives ? "fill-red-400 text-red-400" : "text-white/15"} />)}</div><span className="text-[10px] uppercase tracking-wider text-white/45">Периметр</span></div>
         <div className="absolute right-4 top-[4.8rem] z-20 w-48 rounded-xl border border-cyan-300/15 bg-cyan-950/25 px-3 py-2.5 backdrop-blur-md sm:right-6"><div className="flex items-end justify-between gap-3"><div><div className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/40">Волна {wave}</div><div className="mt-0.5 text-xs font-semibold text-cyan-100">{waveCopy[wave - 1].title}</div></div><div className="text-right"><div className="text-sm font-semibold text-cyan-200">x{speedMultiplier.toFixed(2)}</div><div className="text-[8px] uppercase tracking-wider text-cyan-100/35">темп</div></div></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-nova-accent transition-[width] duration-300" style={{ width: `${waveProgress}%` }} /></div></div>
 
@@ -631,15 +706,19 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         </div>
 
         <div className="absolute inset-x-0 top-[82%] z-10"><div className="defense-perimeter h-px bg-red-400/75 shadow-[0_0_18px_rgba(248,113,113,0.8)]" /><div className="absolute right-4 top-2 text-[8px] font-bold uppercase tracking-[0.22em] text-red-300/75 sm:right-8">Critical perimeter · breach</div></div>
+        {powerupRemaining.shield > 0 && <div className="defense-shield-field pointer-events-none absolute bottom-[-1.8rem] left-1/2 z-10 h-36 w-72 -translate-x-1/2 rounded-[50%] border border-cyan-200/45 bg-cyan-200/[0.035]" />}
         <div className="defense-core absolute bottom-[1.2%] left-1/2 z-10 h-16 w-16 -translate-x-1/2 rounded-full border border-nova-accent/55 bg-nova-accent/15 shadow-[0_0_35px_rgba(227,182,75,0.42)]"><div className="absolute inset-3 rounded-full border border-cyan-300/45 bg-[#071113] shadow-[inset_0_0_16px_rgba(83,221,235,0.35)]" /><div className="absolute inset-[1.35rem] rounded-full bg-nova-accent shadow-[0_0_20px_rgba(227,182,75,0.9)]" /></div>
 
         <aside className="absolute bottom-24 right-5 z-20 hidden w-64 rounded-2xl border border-white/[0.08] bg-[#071012]/72 p-4 shadow-2xl backdrop-blur-xl xl:block"><div className="flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Combat log</span><Crosshair size={14} className="text-cyan-300" /></div><div className="mt-3 grid grid-cols-2 gap-2"><MiniMetric label="Уничтожено" value={stats.destroyed} /><MiniMetric label="Макс. комбо" value={`x${stats.maxCombo}`} /></div><div className="mt-3 grid grid-cols-3 gap-1 border-t border-white/[0.06] pt-3"><TargetLegend kind="swift" /><TargetLegend kind="armored" /><TargetLegend kind="special" /></div><div className="mt-3 space-y-2 border-t border-white/[0.06] pt-3">{combatLog.map((item, index) => <div key={`${item}-${index}`} className={index === 0 ? "font-mono text-[9px] text-cyan-200" : "font-mono text-[9px] text-white/32"}>{item}</div>)}{combatLog.length === 0 && <div className="font-mono text-[9px] text-white/25">Ожидание первой цели...</div>}</div></aside>
+
+        <div className="absolute bottom-[5.25rem] left-1/2 z-20 grid w-[min(29rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-3 gap-2"><PowerupButton powerup="shield" charges={powerups.shield} remaining={powerupRemaining.shield} onActivate={activatePowerup} /><PowerupButton powerup="freeze" charges={powerups.freeze} remaining={powerupRemaining.freeze} onActivate={activatePowerup} /><PowerupButton powerup="double" charges={powerups.double} remaining={powerupRemaining.double} onActivate={activatePowerup} /></div>
 
         <div className="absolute bottom-5 left-5 z-20 flex items-center gap-3 text-[10px] text-white/35 sm:left-7"><span>Esc — пауза</span><span>Tab — заново</span><span className="hidden sm:inline">Печатайте первую букву для захвата цели</span></div>
         {capsLock && <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-200 backdrop-blur-xl">Caps Lock включён</div>}
       </>}
 
       {waveBanner && phaseState === "playing" && <div className="defense-wave-banner pointer-events-none absolute left-1/2 top-28 z-30 -translate-x-1/2 text-center"><div className="text-[9px] font-bold uppercase tracking-[0.42em] text-cyan-200/65">Волна {waveBanner} / {DEFENSE_MAX_WAVES}</div><div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-white drop-shadow-[0_0_24px_rgba(83,221,235,0.42)]">{waveCopy[waveBanner - 1].title}</div><div className="mt-1 text-[10px] uppercase tracking-[0.15em] text-white/38">{waveCopy[waveBanner - 1].text}</div></div>}
+      {powerupToast && phaseState === "playing" && <div className="defense-powerup-toast pointer-events-none absolute left-1/2 top-52 z-30 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#071012]/88 px-5 py-3 text-center shadow-2xl backdrop-blur-xl"><div className="flex items-center justify-center gap-2 text-sm font-semibold text-white"><PowerupIcon powerup={powerupToast} size={16} />{powerupCopy[powerupToast].title} получен</div><div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-white/35">Нажмите {powerupCopy[powerupToast].hotkey} для активации</div></div>}
 
       {(phaseState === "setup" || phaseState === "loading") && <MissionSetup
         arena={arena}
@@ -719,9 +798,9 @@ function MissionSetup({
             <div className="mt-8 grid gap-2 text-[11px] text-white/48 sm:grid-cols-3 lg:grid-cols-1">
               <SetupFeature number="01" title="Шесть волн" text="Каждая волна быстрее предыдущей" />
               <SetupFeature number="02" title="Четыре типа целей" text="Быстрые, броня и особые сигнатуры" />
-              <SetupFeature number="03" title="Удержать ядро" text="Броня при прорыве отнимает 2 жизни" />
+              <SetupFeature number="03" title="Три боевых бонуса" text="Щит, заморозка и двойные очки" />
             </div>
-            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.2</div>
+            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.3</div>
           </div>
         </section>
 
@@ -785,6 +864,18 @@ function TargetLegend({ kind }: { kind: Exclude<DefenseTargetKind, "normal"> }) 
   return <div className={clsx("rounded-lg border px-1.5 py-2 text-center", kind === "swift" ? "border-amber-300/15 bg-amber-300/[0.05] text-amber-200" : kind === "armored" ? "border-sky-300/15 bg-sky-300/[0.05] text-sky-200" : "border-fuchsia-300/15 bg-fuchsia-300/[0.05] text-fuchsia-200")}><span className="flex justify-center"><TargetKindIcon kind={kind} size={11} /></span><span className="mt-1 block text-[6px] font-bold uppercase tracking-wider">{DEFENSE_TARGETS[kind].shortLabel}</span></div>;
 }
 
+function PowerupIcon({ powerup, size = 15 }: { powerup: DefensePowerup; size?: number }) {
+  if (powerup === "shield") return <Shield size={size} />;
+  if (powerup === "freeze") return <Snowflake size={size} />;
+  return <Sparkles size={size} />;
+}
+
+function PowerupButton({ powerup, charges, remaining, onActivate }: { powerup: DefensePowerup; charges: number; remaining: number; onActivate: (powerup: DefensePowerup) => void }) {
+  const active = remaining > 0;
+  const theme = powerup === "shield" ? "border-cyan-300/25 text-cyan-200" : powerup === "freeze" ? "border-sky-300/25 text-sky-200" : "border-nova-accent/25 text-nova-accent";
+  return <button type="button" aria-label={`Активировать: ${powerupCopy[powerup].title}`} disabled={charges < 1 || active} onClick={() => onActivate(powerup)} className={clsx("defense-powerup-button relative flex min-h-14 items-center gap-2 rounded-xl border bg-[#071012]/82 px-3 text-left shadow-xl backdrop-blur-xl transition", theme, active ? "defense-powerup-active" : charges > 0 ? "hover:-translate-y-0.5 hover:bg-white/[0.07]" : "opacity-45")}><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-current/20 bg-current/[0.06]"><PowerupIcon powerup={powerup} /></span><span className="min-w-0"><span className="block truncate text-[10px] font-semibold text-white/85">{powerupCopy[powerup].title}</span><span className="mt-0.5 block truncate text-[7px] uppercase tracking-wider opacity-55">{active ? `${remaining} сек.` : charges > 0 ? `Зарядов: ${charges}` : powerupCopy[powerup].text}</span></span><span className="ml-auto hidden rounded-md border border-white/10 bg-black/20 px-1.5 py-1 font-mono text-[8px] text-white/45 sm:block">{powerupCopy[powerup].hotkey}</span></button>;
+}
+
 function SettingLabel({ title, hint }: { title: string; hint: string }) {
   return <div className="flex items-center justify-between gap-2"><span className="text-[9px] font-bold uppercase tracking-[0.17em] text-white/45">{title}</span><span className="text-[8px] text-white/22">{hint}</span></div>;
 }
@@ -795,6 +886,14 @@ function AudioControl({ icon, title, enabled, volume, onEnabledChange, onVolumeC
 
 function emptyStats(difficulty: DefenseDifficulty): LiveStats {
   return { score: 0, lives: DEFENSE_CONFIG[difficulty].lives, combo: 0, maxCombo: 0, destroyed: 0, missed: 0, correctChars: 0, errors: 0, elapsedMs: 0 };
+}
+
+function emptyPowerupCharges(): PowerupCharges {
+  return { shield: 0, freeze: 0, double: 0 };
+}
+
+function emptyActivePowerups(): ActivePowerups {
+  return { shieldUntil: 0, freezeUntil: 0, doubleUntil: 0 };
 }
 
 function clampVolume(value: number) {

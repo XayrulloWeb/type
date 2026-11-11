@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyDefenseChallenge } from "@/lib/defense-challenge";
-import { defenseGrade, defenseTargetKind, defenseWordScore, type DefenseEvent } from "@/lib/defense-shared";
+import { DEFENSE_POWERUP_DURATION_MS, defenseGrade, defensePowerupDrop, defenseTargetKind, defenseWordScore, type DefenseEvent, type DefensePowerup } from "@/lib/defense-shared";
 
 const MAX_EVENTS = 6_000;
 
@@ -80,16 +80,27 @@ function processEvents(rawEvents: unknown[], words: string[], difficulty: "easy"
   let combo = 0;
   let maxCombo = 0;
   let score = 0;
+  const powerupCharges: Record<DefensePowerup, number> = { shield: 0, freeze: 0, double: 0 };
+  const powerupActiveUntil: Record<DefensePowerup, number> = { shield: 0, freeze: 0, double: 0 };
 
   for (const rawEvent of rawEvents) {
     if (!rawEvent || typeof rawEvent !== "object") return null;
-    const event = rawEvent as Partial<DefenseEvent> & { wordIndex?: unknown; charIndex?: unknown; atMs?: unknown; type?: unknown };
+    const event = rawEvent as Partial<DefenseEvent> & { wordIndex?: unknown; charIndex?: unknown; atMs?: unknown; powerup?: unknown; type?: unknown };
     if (typeof event.atMs !== "number" || !Number.isFinite(event.atMs) || event.atMs < lastTime || event.atMs < 0 || event.atMs > durationMs + 1_000) return null;
     lastTime = event.atMs;
 
     if (event.type === "error") {
       errorCount += 1;
       combo = 0;
+      continue;
+    }
+
+    if (event.type === "powerup") {
+      const powerup = event.powerup;
+      if (powerup !== "shield" && powerup !== "freeze" && powerup !== "double") return null;
+      if (powerupCharges[powerup] < 1 || powerupActiveUntil[powerup] > event.atMs) return null;
+      powerupCharges[powerup] -= 1;
+      powerupActiveUntil[powerup] = event.atMs + DEFENSE_POWERUP_DURATION_MS[powerup];
       continue;
     }
 
@@ -112,7 +123,10 @@ function processEvents(rawEvents: unknown[], words: string[], difficulty: "easy"
       destroyed += 1;
       combo += 1;
       maxCombo = Math.max(maxCombo, combo);
-      score += defenseWordScore(words[wordIndex], difficulty, combo, defenseTargetKind(wordIndex, difficulty));
+      const scoreMultiplier = powerupActiveUntil.double > event.atMs ? 2 : 1;
+      score += defenseWordScore(words[wordIndex], difficulty, combo, defenseTargetKind(wordIndex, difficulty)) * scoreMultiplier;
+      const powerup = defensePowerupDrop(wordIndex);
+      if (powerup) powerupCharges[powerup] = Math.min(2, powerupCharges[powerup] + 1);
       continue;
     }
 
