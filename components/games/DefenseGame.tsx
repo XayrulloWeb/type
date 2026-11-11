@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Crosshair, Expand, Gamepad2, Heart, Pause, Play, RotateCcw, Shield, Trophy, Volume2, VolumeX, X } from "lucide-react";
+import { Building2, Crosshair, Expand, Gamepad2, Heart, Music2, Pause, Play, RotateCcw, Shield, Snowflake, Sparkles, Trophy, Volume2, VolumeX, X } from "lucide-react";
 import clsx from "clsx";
 import {
   DEFENSE_CONFIG,
@@ -15,6 +15,13 @@ import {
 } from "@/lib/defense-shared";
 
 type Phase = "setup" | "loading" | "countdown" | "playing" | "paused" | "saving" | "result";
+type ArenaTheme = "nova" | "cyber" | "ice";
+
+interface MusicEngine {
+  gain: GainNode;
+  oscillators: OscillatorNode[];
+  lfo: OscillatorNode;
+}
 
 interface DefenseChallenge {
   token: string;
@@ -58,6 +65,32 @@ const difficultyCopy: Record<DefenseDifficulty, { title: string; text: string }>
   hard: { title: "Hard", text: "Высокая скорость · знаки" },
 };
 
+const arenaThemes: Record<ArenaTheme, { title: string; subtitle: string; image: string; icon: typeof Sparkles; frequencies: number[] }> = {
+  nova: {
+    title: "NOVA Prime",
+    subtitle: "Золотое ядро",
+    image: "/games/nova-defense-arena.webp",
+    icon: Sparkles,
+    frequencies: [110, 164.81, 220],
+  },
+  cyber: {
+    title: "Neon City",
+    subtitle: "Дождь и неон",
+    image: "/games/nova-defense-cyber-city.webp",
+    icon: Building2,
+    frequencies: [98, 146.83, 196],
+  },
+  ice: {
+    title: "Ice Citadel",
+    subtitle: "Ледяное сияние",
+    image: "/games/nova-defense-ice-citadel.webp",
+    icon: Snowflake,
+    frequencies: [130.81, 196, 261.63],
+  },
+};
+
+const PREFERENCES_KEY = "nova-defense-preferences-v1";
+
 export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean }) {
   const [language, setLanguage] = useState(initialLanguage);
   const [difficulty, setDifficulty] = useState(initialDifficulty);
@@ -70,6 +103,10 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const [result, setResult] = useState<DefenseSavedResult | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [effectsVolume, setEffectsVolume] = useState(0.72);
+  const [musicVolume, setMusicVolume] = useState(0.42);
+  const [arena, setArena] = useState<ArenaTheme>("nova");
   const [capsLock, setCapsLock] = useState(false);
   const [errorFlash, setErrorFlash] = useState(false);
   const [bursts, setBursts] = useState<Burst[]>([]);
@@ -89,6 +126,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   const rafRef = useRef<number | null>(null);
   const saveDurationRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
+  const musicRef = useRef<MusicEngine | null>(null);
+  const preferencesReadyRef = useRef(false);
 
   const setPhase = useCallback((phase: Phase) => {
     phaseRef.current = phase;
@@ -112,6 +151,94 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     setActiveTargetId(id);
   }, []);
 
+  const stopAmbientMusic = useCallback(() => {
+    const engine = musicRef.current;
+    if (!engine) return;
+    const context = audioRef.current;
+    if (context) {
+      engine.gain.gain.cancelScheduledValues(context.currentTime);
+      engine.gain.gain.setTargetAtTime(0.0001, context.currentTime, 0.08);
+    }
+    window.setTimeout(() => {
+      for (const oscillator of engine.oscillators) {
+        try { oscillator.stop(); } catch { /* already stopped */ }
+      }
+      try { engine.lfo.stop(); } catch { /* already stopped */ }
+    }, 420);
+    musicRef.current = null;
+  }, []);
+
+  const startAmbientMusic = useCallback(async () => {
+    if (!musicEnabled) return;
+    const context = audioRef.current ?? new AudioContext();
+    audioRef.current = context;
+    if (context.state === "suspended") await context.resume();
+    stopAmbientMusic();
+
+    const master = context.createGain();
+    const filter = context.createBiquadFilter();
+    const compressor = context.createDynamicsCompressor();
+    const lfo = context.createOscillator();
+    const lfoDepth = context.createGain();
+    const frequencies = arenaThemes[arena].frequencies;
+    const oscillators = frequencies.map((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const voice = context.createGain();
+      oscillator.type = index === 0 ? "sine" : "triangle";
+      oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+      oscillator.detune.setValueAtTime(index === 1 ? -7 : index === 2 ? 6 : 0, context.currentTime);
+      voice.gain.setValueAtTime(index === 0 ? 0.48 : 0.22, context.currentTime);
+      oscillator.connect(voice).connect(filter);
+      oscillator.start();
+      return oscillator;
+    });
+
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(arena === "ice" ? 1_250 : arena === "cyber" ? 920 : 1_080, context.currentTime);
+    filter.Q.setValueAtTime(0.7, context.currentTime);
+    lfo.type = "sine";
+    lfo.frequency.setValueAtTime(0.075, context.currentTime);
+    lfoDepth.gain.setValueAtTime(170, context.currentTime);
+    lfo.connect(lfoDepth).connect(filter.frequency);
+    lfo.start();
+    master.gain.setValueAtTime(0.0001, context.currentTime);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, musicVolume * 0.038), context.currentTime + 0.9);
+    filter.connect(compressor).connect(master).connect(context.destination);
+    musicRef.current = { gain: master, oscillators, lfo };
+  }, [arena, musicEnabled, musicVolume, stopAmbientMusic]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) ?? "null") as Partial<{ arena: ArenaTheme; musicEnabled: boolean; soundEnabled: boolean; musicVolume: number; effectsVolume: number }> | null;
+        if (saved?.arena && saved.arena in arenaThemes) setArena(saved.arena);
+        if (typeof saved?.musicEnabled === "boolean") setMusicEnabled(saved.musicEnabled);
+        if (typeof saved?.soundEnabled === "boolean") setSoundEnabled(saved.soundEnabled);
+        if (typeof saved?.musicVolume === "number") setMusicVolume(clampVolume(saved.musicVolume));
+        if (typeof saved?.effectsVolume === "number") setEffectsVolume(clampVolume(saved.effectsVolume));
+      } catch {
+        window.localStorage.removeItem(PREFERENCES_KEY);
+      }
+      preferencesReadyRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesReadyRef.current) return;
+    window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ arena, musicEnabled, soundEnabled, musicVolume, effectsVolume }));
+  }, [arena, effectsVolume, musicEnabled, musicVolume, soundEnabled]);
+
+  useEffect(() => {
+    const activePhase = phaseState === "countdown" || phaseState === "playing" || phaseState === "paused";
+    if (!musicEnabled || !activePhase) {
+      stopAmbientMusic();
+      return;
+    }
+    void startAmbientMusic();
+    return stopAmbientMusic;
+  }, [musicEnabled, phaseState, startAmbientMusic, stopAmbientMusic]);
+
   const playTone = useCallback((kind: "hit" | "destroy" | "error" | "breach") => {
     if (!soundEnabled) return;
     const context = audioRef.current ?? new AudioContext();
@@ -129,12 +256,12 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     oscillator.type = settings.type;
     oscillator.frequency.setValueAtTime(settings.frequency, context.currentTime);
     if (kind === "destroy") oscillator.frequency.exponentialRampToValueAtTime(1_320, context.currentTime + settings.duration);
-    gain.gain.setValueAtTime(settings.volume, context.currentTime);
+    gain.gain.setValueAtTime(settings.volume * effectsVolume, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + settings.duration);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
     oscillator.stop(context.currentTime + settings.duration);
-  }, [soundEnabled]);
+  }, [effectsVolume, soundEnabled]);
 
   const saveMission = useCallback(async (durationMs: number) => {
     const currentChallenge = challengeRef.current;
@@ -188,7 +315,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     setResult(null);
     setCombatLog([]);
     try {
-      if (soundEnabled) {
+      if (soundEnabled || musicEnabled) {
         audioRef.current ??= new AudioContext();
         if (audioRef.current.state === "suspended") await audioRef.current.resume();
       }
@@ -219,7 +346,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       setPhase("setup");
       setSaveError(true);
     }
-  }, [difficulty, language, setActiveId, setPhase, soundEnabled]);
+  }, [difficulty, language, musicEnabled, setActiveId, setPhase, soundEnabled]);
 
   useEffect(() => {
     if (phaseState !== "countdown") return;
@@ -425,15 +552,15 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
 
   return <main className="relative mx-auto w-full max-w-[1920px] overflow-hidden bg-[#050809]">
     <section className="defense-arena relative h-[calc(100svh-65px)] min-h-[640px] overflow-hidden border-t border-white/[0.04]" aria-label="NOVA Defense game arena">
-      <div className="absolute inset-0 bg-[url('/games/nova-defense-arena.webp')] bg-cover bg-center" />
+      <div className="absolute inset-0 bg-cover bg-center transition-[background-image] duration-700" style={{ backgroundImage: `url(${arenaThemes[arena].image})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,transparent_0,rgba(3,7,8,0.05)_30%,rgba(3,7,8,0.58)_100%)]" />
       <div className="defense-scan absolute inset-0 opacity-25" />
       <div className={clsx("pointer-events-none absolute inset-0 z-30 bg-red-500/15 opacity-0 transition-opacity", errorFlash && "opacity-100")} />
 
       <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[#050809]/72 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <div className="flex items-center gap-2"><Link href="/games" className="icon-button" aria-label="Выйти в игры"><X size={16} /></Link><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent">NOVA Defense · Beta</div><div className="text-[10px] text-white/40">Survival · {difficultyCopy[difficulty].title} · {language.toUpperCase()}</div></div></div>
+        <div className="flex items-center gap-2"><Link href="/games" className="icon-button" aria-label="Выйти в игры"><X size={16} /></Link><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent">NOVA Defense · Beta</div><div className="text-[10px] text-white/40">{arenaThemes[arena].title} · {difficultyCopy[difficulty].title} · {language.toUpperCase()}</div></div></div>
         <div className="hidden items-center gap-2 md:flex"><Hud value={stats.score.toLocaleString("ru-RU")} label="Очки" accent /><Hud value={`x${stats.combo}`} label="Комбо" /><Hud value={wpm} label="WPM" /><Hud value={`${accuracy.toFixed(0)}%`} label="Точность" /></div>
-        <div className="flex items-center gap-2"><button className="icon-button" onClick={() => setSoundEnabled((value) => !value)} aria-label="Звук">{soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button><button className="icon-button" onClick={toggleFullscreen} aria-label="Полный экран"><Expand size={16} /></button>{phaseState === "playing" && <button className="icon-button" onClick={() => setPhase("paused")} aria-label="Пауза"><Pause size={16} /></button>}</div>
+        <div className="flex items-center gap-2"><button className={clsx("icon-button", musicEnabled && "!text-cyan-200")} onClick={() => setMusicEnabled((value) => !value)} aria-label={musicEnabled ? "Выключить музыку" : "Включить музыку"}><Music2 size={16} /></button><button className="icon-button" onClick={() => setSoundEnabled((value) => !value)} aria-label="Звуковые эффекты">{soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button><button className="icon-button" onClick={toggleFullscreen} aria-label="Полный экран"><Expand size={16} /></button>{phaseState === "playing" && <button className="icon-button" onClick={() => setPhase("paused")} aria-label="Пауза"><Pause size={16} /></button>}</div>
       </div>
 
       {(phaseState === "playing" || phaseState === "paused" || phaseState === "saving") && <>
@@ -460,7 +587,25 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         {capsLock && <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-xs font-semibold text-amber-200 backdrop-blur-xl">Caps Lock включён</div>}
       </>}
 
-      {(phaseState === "setup" || phaseState === "loading") && <div className="absolute inset-0 z-40 grid place-items-center bg-[#030708]/42 px-5 backdrop-blur-[3px]"><div className="w-full max-w-3xl rounded-[2rem] border border-white/[0.1] bg-[#081012]/88 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.58)] backdrop-blur-2xl sm:p-9"><div className="text-center"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-nova-accent/25 bg-nova-accent/10 text-nova-accent"><Shield size={26} /></div><p className="page-eyebrow mt-5">Survival mission</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] sm:text-5xl">Защита периметра</h1><p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-white/48">Выберите режим, нажмите старт и печатайте падающие слова до того, как они достигнут красной линии.</p></div><div className="mt-8 grid gap-4 sm:grid-cols-[10rem_1fr]"><div><div className="mb-2 text-[9px] font-bold uppercase tracking-[0.17em] text-white/35">Язык целей</div><div className="grid grid-cols-2 gap-2">{(["en", "ru"] as DefenseLanguage[]).map((item) => <button key={item} onClick={() => setLanguage(item)} className={language === item ? "test-option test-option-active uppercase" : "test-option border border-white/[0.06] uppercase"}>{item}</button>)}</div></div><div><div className="mb-2 text-[9px] font-bold uppercase tracking-[0.17em] text-white/35">Сложность</div><div className="grid gap-2 sm:grid-cols-3">{(["easy", "medium", "hard"] as DefenseDifficulty[]).map((item) => <button key={item} onClick={() => setDifficulty(item)} className={clsx("rounded-xl border p-3 text-left transition", difficulty === item ? "border-nova-accent/35 bg-nova-accent/10" : "border-white/[0.07] bg-white/[0.025] hover:border-white/15")}><div className={difficulty === item ? "text-sm font-semibold text-nova-accent" : "text-sm font-semibold text-white/75"}>{difficultyCopy[item].title}</div><div className="mt-1 text-[9px] text-white/35">{difficultyCopy[item].text}</div></button>)}</div></div></div>{saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-center text-xs text-red-200">Не удалось подготовить миссию. Проверьте соединение и попробуйте снова.</div>}<div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row"><button onClick={() => void startMission()} disabled={phaseState === "loading"} className="nova-button !min-h-12 !min-w-52 !rounded-xl"><Gamepad2 size={17} />{phaseState === "loading" ? "Подготовка арены..." : "Начать миссию"}</button><Link href="/games" className="nova-button-secondary !min-h-12 !rounded-xl">Вернуться в игры</Link></div></div></div>}
+      {(phaseState === "setup" || phaseState === "loading") && <MissionSetup
+        arena={arena}
+        difficulty={difficulty}
+        effectsVolume={effectsVolume}
+        language={language}
+        loading={phaseState === "loading"}
+        musicEnabled={musicEnabled}
+        musicVolume={musicVolume}
+        saveError={saveError}
+        soundEnabled={soundEnabled}
+        onArenaChange={setArena}
+        onDifficultyChange={setDifficulty}
+        onEffectsVolumeChange={setEffectsVolume}
+        onLanguageChange={setLanguage}
+        onMusicEnabledChange={setMusicEnabled}
+        onMusicVolumeChange={setMusicVolume}
+        onSoundEnabledChange={setSoundEnabled}
+        onStart={() => void startMission()}
+      />}
 
       {phaseState === "countdown" && <div className="absolute inset-0 z-40 grid place-items-center bg-black/35 backdrop-blur-sm"><div className="text-center"><div className="defense-countdown text-8xl font-semibold text-nova-accent drop-shadow-[0_0_35px_rgba(227,182,75,0.6)]">{countdown}</div><div className="mt-4 text-xs font-bold uppercase tracking-[0.3em] text-white/45">Система активируется</div></div></div>}
       {phaseState === "paused" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/72 px-5 backdrop-blur-lg"><div className="text-center"><Pause className="mx-auto text-nova-accent" size={34} /><h2 className="mt-5 text-3xl font-semibold">Миссия приостановлена</h2><p className="mt-2 text-sm text-white/40">Цели остановлены. Нажмите пробел или продолжите кнопкой.</p><div className="mt-6 flex justify-center gap-3"><button className="nova-button" onClick={() => setPhase("playing")}><Play size={16} /> Продолжить</button><button className="nova-button-secondary" onClick={finishMission}>Завершить</button></div></div></div>}
@@ -470,8 +615,118 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
   </main>;
 }
 
+function MissionSetup({
+  arena,
+  difficulty,
+  effectsVolume,
+  language,
+  loading,
+  musicEnabled,
+  musicVolume,
+  saveError,
+  soundEnabled,
+  onArenaChange,
+  onDifficultyChange,
+  onEffectsVolumeChange,
+  onLanguageChange,
+  onMusicEnabledChange,
+  onMusicVolumeChange,
+  onSoundEnabledChange,
+  onStart,
+}: {
+  arena: ArenaTheme;
+  difficulty: DefenseDifficulty;
+  effectsVolume: number;
+  language: DefenseLanguage;
+  loading: boolean;
+  musicEnabled: boolean;
+  musicVolume: number;
+  saveError: boolean;
+  soundEnabled: boolean;
+  onArenaChange: (arena: ArenaTheme) => void;
+  onDifficultyChange: (difficulty: DefenseDifficulty) => void;
+  onEffectsVolumeChange: (volume: number) => void;
+  onLanguageChange: (language: DefenseLanguage) => void;
+  onMusicEnabledChange: (enabled: boolean) => void;
+  onMusicVolumeChange: (volume: number) => void;
+  onSoundEnabledChange: (enabled: boolean) => void;
+  onStart: () => void;
+}) {
+  return <div className="absolute inset-0 z-40 overflow-y-auto bg-[#030708]/38 px-4 py-5 backdrop-blur-[3px] sm:px-6 sm:py-8">
+    <div className="mx-auto grid min-h-full w-full max-w-6xl place-items-center">
+      <div className="grid w-full overflow-hidden rounded-[2rem] border border-white/[0.11] bg-[#071012]/88 shadow-[0_45px_140px_rgba(0,0,0,0.68)] backdrop-blur-2xl lg:grid-cols-[0.82fr_1.18fr]">
+        <section className="relative overflow-hidden border-b border-white/[0.07] p-7 lg:border-b-0 lg:border-r lg:p-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(227,182,75,0.13),transparent_36%),linear-gradient(160deg,rgba(255,255,255,0.035),transparent_58%)]" />
+          <div className="relative flex h-full flex-col">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-nova-accent/20 bg-nova-accent/[0.08] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] text-nova-accent"><Shield size={12} /> Mission control</div>
+            <div className="mt-8 grid h-16 w-16 place-items-center rounded-2xl border border-nova-accent/25 bg-nova-accent/10 text-nova-accent shadow-[0_0_38px_rgba(227,182,75,0.13)]"><Shield size={29} /></div>
+            <h1 className="mt-6 max-w-md text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl">Защита<br /><span className="text-nova-accent">периметра</span></h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-white/48">Выберите арену и режим. Печатайте падающие цели, создавайте комбо и не позволяйте им пройти критическую линию.</p>
+            <div className="mt-8 grid gap-2 text-[11px] text-white/48 sm:grid-cols-3 lg:grid-cols-1">
+              <SetupFeature number="01" title="Захват цели" text="Начните с первой буквы" />
+              <SetupFeature number="02" title="Чистая серия" text="Ошибки сбрасывают комбо" />
+              <SetupFeature number="03" title="Удержать ядро" text="Скорость растёт со временем" />
+            </div>
+            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.1</div>
+          </div>
+        </section>
+
+        <section className="p-6 sm:p-8 lg:p-10">
+          <div className="flex items-end justify-between gap-4"><div><p className="page-eyebrow">Подготовка миссии</p><h2 className="mt-1 text-xl font-semibold">Настройте свою арену</h2></div><div className="nova-badge hidden sm:inline-flex">Настройки сохраняются</div></div>
+
+          <div className="mt-6">
+            <SettingLabel title="Арена" hint="Выберите атмосферу боя" />
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {(Object.keys(arenaThemes) as ArenaTheme[]).map((item) => {
+                const theme = arenaThemes[item];
+                const Icon = theme.icon;
+                return <button key={item} type="button" aria-pressed={arena === item} onClick={() => onArenaChange(item)} className={clsx("group relative min-h-24 overflow-hidden rounded-xl border text-left transition duration-200", arena === item ? "border-cyan-300/55 shadow-[0_0_28px_rgba(83,221,235,0.12)]" : "border-white/[0.08] hover:border-white/20")}>
+                  <span className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${theme.image})` }} />
+                  <span className="absolute inset-0 bg-gradient-to-t from-[#030708] via-[#030708]/45 to-transparent" />
+                  <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 p-2.5"><span><span className="block text-[11px] font-semibold text-white/90">{theme.title}</span><span className="mt-0.5 block text-[8px] text-white/45">{theme.subtitle}</span></span><Icon size={13} className={arena === item ? "text-cyan-200" : "text-white/45"} /></span>
+                </button>;
+              })}
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-[8rem_1fr]">
+            <div><SettingLabel title="Язык" hint="Цели" /><div className="mt-2 grid grid-cols-2 gap-2">{(["en", "ru"] as DefenseLanguage[]).map((item) => <button key={item} type="button" onClick={() => onLanguageChange(item)} className={language === item ? "test-option test-option-active uppercase" : "test-option border border-white/[0.06] uppercase"}>{item}</button>)}</div></div>
+            <div><SettingLabel title="Сложность" hint="Темп атаки" /><div className="mt-2 grid grid-cols-3 gap-2">{(["easy", "medium", "hard"] as DefenseDifficulty[]).map((item) => <button key={item} type="button" onClick={() => onDifficultyChange(item)} className={clsx("rounded-xl border px-3 py-2.5 text-left transition", difficulty === item ? "border-nova-accent/35 bg-nova-accent/10" : "border-white/[0.07] bg-white/[0.025] hover:border-white/15")}><span className={difficulty === item ? "block text-xs font-semibold text-nova-accent" : "block text-xs font-semibold text-white/72"}>{difficultyCopy[item].title}</span><span className="mt-1 hidden text-[8px] text-white/32 sm:block">{item === "easy" ? "4 жизни" : item === "medium" ? "3 жизни" : "Знаки · 3 жизни"}</span></button>)}</div></div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-white/[0.07] bg-black/15 p-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <AudioControl icon={<Music2 size={15} />} title="Музыка" enabled={musicEnabled} volume={musicVolume} onEnabledChange={onMusicEnabledChange} onVolumeChange={onMusicVolumeChange} />
+              <AudioControl icon={soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />} title="Эффекты" enabled={soundEnabled} volume={effectsVolume} onEnabledChange={onSoundEnabledChange} onVolumeChange={onEffectsVolumeChange} />
+            </div>
+          </div>
+
+          {saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-center text-xs text-red-200">Не удалось подготовить миссию. Проверьте соединение и попробуйте снова.</div>}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button onClick={onStart} disabled={loading} className="nova-button !min-h-12 !flex-1 !rounded-xl"><Gamepad2 size={17} />{loading ? "Подготовка арены..." : "Запустить миссию"}</button><Link href="/games" className="nova-button-secondary !min-h-12 !rounded-xl">Назад</Link></div>
+        </section>
+      </div>
+    </div>
+  </div>;
+}
+
+function SetupFeature({ number, title, text }: { number: string; title: string; text: string }) {
+  return <div className="flex items-center gap-3 rounded-xl border border-white/[0.055] bg-white/[0.022] p-3"><span className="font-mono text-[9px] text-nova-accent">{number}</span><span><span className="block font-semibold text-white/72">{title}</span><span className="mt-0.5 block text-[9px] text-white/30">{text}</span></span></div>;
+}
+
+function SettingLabel({ title, hint }: { title: string; hint: string }) {
+  return <div className="flex items-center justify-between gap-2"><span className="text-[9px] font-bold uppercase tracking-[0.17em] text-white/45">{title}</span><span className="text-[8px] text-white/22">{hint}</span></div>;
+}
+
+function AudioControl({ icon, title, enabled, volume, onEnabledChange, onVolumeChange }: { icon: React.ReactNode; title: string; enabled: boolean; volume: number; onEnabledChange: (enabled: boolean) => void; onVolumeChange: (volume: number) => void }) {
+  return <div><div className="flex items-center justify-between"><button type="button" onClick={() => onEnabledChange(!enabled)} className={clsx("flex items-center gap-2 text-[11px] font-semibold transition", enabled ? "text-cyan-200" : "text-white/35")}>{icon}{title}</button><span className="font-mono text-[9px] text-white/28">{enabled ? `${Math.round(volume * 100)}%` : "Выкл"}</span></div><input aria-label={`Громкость: ${title}`} className="defense-volume mt-3 w-full" type="range" min="0" max="100" step="1" disabled={!enabled} value={Math.round(volume * 100)} onChange={(event) => onVolumeChange(clampVolume(Number(event.target.value) / 100))} /></div>;
+}
+
 function emptyStats(difficulty: DefenseDifficulty): LiveStats {
   return { score: 0, lives: DEFENSE_CONFIG[difficulty].lives, combo: 0, maxCombo: 0, destroyed: 0, missed: 0, correctChars: 0, errors: 0, elapsedMs: 0 };
+}
+
+function clampVolume(value: number) {
+  return Math.min(1, Math.max(0, value));
 }
 
 function liveAccuracy(stats: LiveStats) {

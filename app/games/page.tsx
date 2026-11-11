@@ -29,6 +29,11 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
     <section className="relative overflow-hidden rounded-[2rem] border border-nova-accent/15 bg-[#101416] shadow-[0_35px_100px_rgba(0,0,0,0.42)]">
       <div className="absolute inset-0 bg-[url('/games/nova-defense-arena.webp')] bg-cover bg-center opacity-75" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#080b0d]/96 via-[#080b0d]/72 to-[#080b0d]/15" />
+      <div className="absolute bottom-8 right-8 top-8 hidden w-[23rem] grid-cols-1 gap-2 xl:grid">
+        <ArenaPreview image="/games/nova-defense-arena.webp" title="NOVA Prime" subtitle="Золотое ядро" />
+        <ArenaPreview image="/games/nova-defense-cyber-city.webp" title="Neon City" subtitle="Ночной мегаполис" />
+        <ArenaPreview image="/games/nova-defense-ice-citadel.webp" title="Ice Citadel" subtitle="Ледяное сияние" />
+      </div>
       <div className="relative max-w-2xl px-7 py-14 sm:px-12 sm:py-20">
         <div className="inline-flex items-center gap-2 rounded-full border border-nova-accent/25 bg-nova-accent/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent"><Sparkles size={12} /> Beta · игровая лаборатория</div>
         <h1 className="mt-6 text-4xl font-semibold tracking-[-0.055em] text-white sm:text-6xl">NOVA Defense</h1>
@@ -56,5 +61,6 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
 }
 
 function Feature({ icon, text }: { icon: React.ReactNode; text: string }) { return <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/25 px-3 py-2 backdrop-blur-sm">{icon}{text}</span>; }
+function ArenaPreview({ image, title, subtitle }: { image: string; title: string; subtitle: string }) { return <div className="group relative overflow-hidden rounded-2xl border border-white/[0.1] shadow-xl"><div className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${image})` }} /><div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/25 to-transparent" /><div className="relative flex h-full items-end p-4"><div><div className="text-xs font-semibold text-white/90">{title}</div><div className="mt-0.5 text-[9px] text-white/45">{subtitle}</div></div></div></div>; }
 function Filter({ active, href, children }: { active: boolean; href: string; children: React.ReactNode }) { return <Link href={href} className={active ? "test-option test-option-active capitalize" : "test-option capitalize"}>{children}</Link>; }
 function gameFilterHref(language: DefenseLanguage, difficulty: DefenseDifficulty) { return `/games?language=${language}&difficulty=${difficulty}`; }
