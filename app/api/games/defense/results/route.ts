@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyDefenseChallenge } from "@/lib/defense-challenge";
-import { defenseGrade, defenseWordScore, type DefenseEvent } from "@/lib/defense-shared";
+import { defenseGrade, defenseTargetKind, defenseWordScore, type DefenseEvent } from "@/lib/defense-shared";
 
 const MAX_EVENTS = 6_000;
 
@@ -112,7 +112,7 @@ function processEvents(rawEvents: unknown[], words: string[], difficulty: "easy"
       destroyed += 1;
       combo += 1;
       maxCombo = Math.max(maxCombo, combo);
-      score += defenseWordScore(words[wordIndex], difficulty, combo);
+      score += defenseWordScore(words[wordIndex], difficulty, combo, defenseTargetKind(wordIndex, difficulty));
       continue;
     }
 
