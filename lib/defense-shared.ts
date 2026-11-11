@@ -51,6 +51,9 @@ export function defenseTargetKind(wordIndex: number, difficulty: DefenseDifficul
       : { swift: 6, armored: 19, special: 38 };
   const marker = (wordIndex * 11 + (difficulty === "easy" ? 3 : difficulty === "medium" ? 7 : 13)) % 24;
 
+  if (wordIndex === unlocks.special) return "special";
+  if (wordIndex === unlocks.armored) return "armored";
+  if (wordIndex === unlocks.swift) return "swift";
   if (wordIndex >= unlocks.special && marker <= 2) return "special";
   if (wordIndex >= unlocks.armored && marker >= 3 && marker <= 6) return "armored";
   if (wordIndex >= unlocks.swift && marker >= 7 && marker <= 13) return "swift";
