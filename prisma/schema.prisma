@@ -35,29 +35,34 @@ model User {
 }
 
 model GameResult {
-  id              String   @id @default(uuid())
-  clientRunId     String   @unique
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  game            String   @default("defense")
-  language        String
-  difficulty      String
-  score           Int
-  wpm             Int
-  accuracy        Float
-  destroyed       Int
-  missed          Int
-  maxCombo        Int
-  duration        Int
-  correctChars    Int
-  errorCount      Int
-  bossesDestroyed Int      @default(0)
-  rewardCredits   Int      @default(0)
-  isRanked        Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  id               String    @id @default(uuid())
+  clientRunId      String    @unique
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  game             String    @default("defense")
+  language         String
+  difficulty       String
+  score            Int
+  wpm              Int
+  accuracy         Float
+  destroyed        Int
+  missed           Int
+  maxCombo         Int
+  duration         Int
+  correctChars     Int
+  errorCount       Int
+  bossesDestroyed  Int       @default(0)
+  rewardCredits    Int       @default(0)
+  isRanked         Boolean   @default(true)
+  moderationStatus String? // "annulled" or "restored"
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  createdAt        DateTime  @default(now())
 
   @@index([game, difficulty, language, isRanked, score])
   @@index([userId, createdAt])
+  @@index([moderationStatus, createdAt])
 }
 
 model Class {

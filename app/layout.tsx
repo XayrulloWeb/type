@@ -20,7 +20,7 @@ export default async function RootLayout({
 }>) {
   const { locale } = await getI18n();
   return (
-    <html lang={locale} className={`${inter.variable} ${robotoMono.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${robotoMono.variable}`} data-scroll-behavior="smooth">
       <body className="min-h-screen bg-nova-bg font-sans text-nova-text antialiased selection:bg-nova-accent selection:text-nova-bg">
         <LocaleProvider locale={locale}><Providers>{children}</Providers></LocaleProvider>
       </body>

@@ -19,6 +19,8 @@ const actionLabels: Record<string, string> = {
   "result.rejected": "Result rejected",
   "result.annulled": "Результат аннулирован",
   "result.restored": "Результат возвращён",
+  "game_result.annulled": "Игровой результат аннулирован",
+  "game_result.restored": "Игровой результат возвращён",
 };
 
 export default async function ActivityPage() {
