@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     const isRanked = user.role === "STUDENT" && duration >= 12 && processed.destroyed >= 5 && accuracy >= 70 && wpm <= 220;
     const rewards = defenseRewards({ ...processed, accuracy });
-    const rewardCredits = isRanked ? rewards.credits : 0;
+    const rewardCredits = isRanked || user.role === "SUPER_ADMIN" ? rewards.credits : 0;
     const result = await prisma.gameResult.create({
       data: {
         clientRunId: runId,

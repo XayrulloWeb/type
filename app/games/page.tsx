@@ -23,9 +23,10 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const language: DefenseLanguage = query.language === "ru" ? "ru" : "en";
   const difficulty: DefenseDifficulty = query.difficulty === "medium" || query.difficulty === "hard" ? query.difficulty : "easy";
   const view: RankingView = query.view === "classes" ? "classes" : "students";
+  const isAdmin = user.role === "SUPER_ADMIN";
   const [rankings, progress, totalMissions, players] = await Promise.all([
     getDefenseRankings(language, difficulty),
-    getDefensePlayerProgress(session.user.id),
+    getDefensePlayerProgress(session.user.id, isAdmin),
     prisma.gameResult.count({ where: { game: "defense", user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
     prisma.gameResult.groupBy({ by: ["userId"], where: { game: "defense", user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
   ]);
@@ -71,7 +72,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
       <aside className="space-y-4">
         <div className="relative overflow-hidden rounded-2xl border border-nova-accent/20 bg-[linear-gradient(145deg,rgba(227,182,75,0.1),rgba(255,255,255,0.025))] p-6">
           <div className="absolute -right-5 -top-5 h-28 w-28 rounded-full bg-nova-accent/[0.07] blur-2xl" />
-          <div className="relative"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl border border-nova-accent/20 bg-nova-accent/10 text-nova-accent"><Coins size={20} /></span><span className="nova-badge">Кошелёк</span></div><div className="mt-5 text-4xl font-semibold text-nova-accent">{progress.credits.toLocaleString("ru-RU")}</div><div className="mt-1 text-xs font-semibold">NOVA Credits</div><div className="mt-4 text-[10px] leading-5 text-nova-muted">Начисляются только за подтверждённые рейтинговые миссии.</div></div>
+          <div className="relative"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl border border-nova-accent/20 bg-nova-accent/10 text-nova-accent"><Coins size={20} /></span><span className="nova-badge">{isAdmin ? "Админ-прогресс" : "Кошелёк"}</span></div><div className="mt-5 text-4xl font-semibold text-nova-accent">{progress.credits.toLocaleString("ru-RU")}</div><div className="mt-1 text-xs font-semibold">NOVA Credits</div><div className="mt-4 text-[10px] leading-5 text-nova-muted">{isAdmin ? "Начисляются за личные миссии администратора и не влияют на рейтинг учеников." : "Начисляются только за подтверждённые рейтинговые миссии."}</div></div>
         </div>
         <div className="data-card p-6"><Award className="text-cyan-200" size={22} /><div className="mt-5 flex items-end gap-2"><div className="text-4xl font-semibold">{progress.unlockedAchievements}</div><div className="pb-1 text-xs text-nova-muted">из {progress.achievements.length}</div></div><div className="mt-1 text-xs text-nova-muted">достижений открыто</div><div className="mt-5 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-5"><SmallStat value={progress.missions} label="миссий" /><SmallStat value={progress.bosses} label="боссов" /></div></div>
         <div className="data-card p-6"><Medal className="text-nova-accent" size={22} /><div className="mt-5 text-3xl font-semibold">{totalMissions}</div><div className="mt-1 text-xs text-nova-muted">миссий школы</div><div className="mt-5 border-t border-white/[0.06] pt-5"><div className="text-2xl font-semibold text-nova-accent">{players.length}</div><div className="text-xs text-nova-muted">игроков beta</div></div></div>
@@ -79,11 +80,11 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
     </section>
 
     <section className="mt-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="page-eyebrow">Личный прогресс</p><h2 className="mt-1 text-2xl font-semibold">Достижения защитника</h2></div><div className="text-xs text-nova-muted">Открыто {progress.unlockedAchievements} из {progress.achievements.length}</div></div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="page-eyebrow">Личный прогресс</p><h2 className="mt-1 text-2xl font-semibold">{isAdmin ? "Достижения администратора" : "Достижения защитника"}</h2></div><div className="text-xs text-nova-muted">Открыто {progress.unlockedAchievements} из {progress.achievements.length}</div></div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{progress.achievements.map((achievement) => <AchievementCard key={achievement.id} achievement={achievement} />)}</div>
     </section>
 
-    <div className="mt-8 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.045] p-5 text-xs leading-6 text-cyan-100/65"><b className="text-cyan-200">Важно:</b> игровые очки, кредиты и достижения хранятся отдельно и не меняют обычный школьный рейтинг WPM.</div>
+    <div className="mt-8 rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.045] p-5 text-xs leading-6 text-cyan-100/65"><b className="text-cyan-200">Важно:</b> {isAdmin ? "очки, кредиты и достижения администратора сохраняются в его личном прогрессе, но не участвуют в рейтингах учеников и классов." : "игровые очки, кредиты и достижения хранятся отдельно и не меняют обычный школьный рейтинг WPM."}</div>
   </main></div>;
 }
 
