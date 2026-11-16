@@ -24,5 +24,5 @@ export default async function DefensePage({ searchParams }: { searchParams: Prom
   const ownedArenas = defenseOwnedArenas(purchases.map((purchase) => purchase.itemId));
   const loadout = normalizeDefenseLoadout(savedLoadout);
 
-  return <div className="min-h-screen bg-[#06090a]"><Header user={session.user} /><DefenseGame initialLanguage={language} initialDifficulty={difficulty} adminMode={user.role === "SUPER_ADMIN"} ownedArenas={ownedArenas} initialLoadout={loadout} /></div>;
+  return <div className="min-h-screen bg-[#06090a]"><Header user={session.user} /><DefenseGame initialLanguage={language} initialDifficulty={difficulty} adminMode={user.role === "SUPER_ADMIN"} ownedArenas={ownedArenas} initialLoadout={loadout} customMusicUrl={savedLoadout?.customMusicUrl} /></div>;
 }

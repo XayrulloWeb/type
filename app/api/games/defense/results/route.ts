@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyDefenseChallenge } from "@/lib/defense-challenge";
-import { DEFENSE_POWERUP_DURATION_MS, defenseGrade, defensePowerupDrop, defenseRequiredHits, defenseRewards, defenseTargetKind, defenseWordScore, type DefenseEvent, type DefensePowerup } from "@/lib/defense-shared";
+import { DEFENSE_POWERUP_DURATION_MS, defenseBoxReward, defenseGrade, defensePowerupDrop, defenseRequiredHits, defenseRewards, defenseTargetKind, defenseWordScore, type DefenseEvent, type DefensePowerup } from "@/lib/defense-shared";
 
 const MAX_EVENTS = 6_000;
 
@@ -29,7 +29,8 @@ export async function POST(request: Request) {
     const existing = await prisma.gameResult.findUnique({ where: { clientRunId: runId } });
     if (existing) {
       if (existing.userId !== session.user.id) return NextResponse.json({ error: "Invalid game result." }, { status: 400 });
-      const rewards = defenseRewards(existing);
+      const existingDifficulty = existing.difficulty === "medium" || existing.difficulty === "hard" ? existing.difficulty : "easy";
+      const rewards = defenseRewards({ ...existing, difficulty: existingDifficulty });
       return NextResponse.json({ ...existing, grade: defenseGrade(existing.accuracy, existing.maxCombo, existing.destroyed), stars: rewards.stars, medals: rewards.medals });
     }
 
@@ -43,8 +44,11 @@ export async function POST(request: Request) {
     if (wpm > 600) return NextResponse.json({ error: "Invalid game speed." }, { status: 400 });
 
     const isRanked = user.role === "STUDENT" && duration >= 12 && processed.destroyed >= 5 && accuracy >= 70 && wpm <= 220;
-    const rewards = defenseRewards({ ...processed, accuracy });
-    const rewardCredits = user.role === "SUPER_ADMIN" ? rewards.credits * 2 : isRanked ? rewards.credits : 0;
+    const rewards = defenseRewards({ ...processed, accuracy, difficulty: challenge.difficulty, duration });
+    const boxReward = defenseBoxReward({ accuracy, destroyed: processed.destroyed, difficulty: challenge.difficulty, duration, stars: rewards.stars, wpm, roll: Math.random() });
+    const rewardMultiplier = user.role === "SUPER_ADMIN" ? 2 : 1;
+    const boxCredits = (user.role === "SUPER_ADMIN" || isRanked) ? boxReward.credits * rewardMultiplier : 0;
+    const rewardCredits = (user.role === "SUPER_ADMIN" || isRanked) ? rewards.credits * rewardMultiplier + boxCredits : 0;
     const result = await prisma.gameResult.create({
       data: {
         clientRunId: runId,
@@ -63,6 +67,8 @@ export async function POST(request: Request) {
         errorCount: processed.errorCount,
         bossesDestroyed: processed.bossesDestroyed,
         rewardCredits,
+        rewardBox: boxCredits > 0 ? boxReward.box : null,
+        boxCredits,
         isRanked,
       },
     });

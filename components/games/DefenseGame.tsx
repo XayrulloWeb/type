@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, LockKeyhole, Medal, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, ShoppingBag, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
+import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, LockKeyhole, Medal, Music2, PackageOpen, Pause, Play, RotateCcw, Shield, ShieldCheck, ShoppingBag, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
 import clsx from "clsx";
 import { getDefenseShopItemForArena, getDefenseShopItemForCategory, type DefenseArenaTheme, type DefenseLaserTheme, type DefenseLoadout } from "@/lib/defense-shop";
 import {
@@ -22,6 +22,7 @@ import {
   type DefenseEvent,
   type DefenseLanguage,
   type DefensePowerup,
+  type DefenseRewardBox,
   type DefenseSavedResult,
   type DefenseTargetKind,
 } from "@/lib/defense-shared";
@@ -78,24 +79,24 @@ type PowerupCharges = Record<DefensePowerup, number>;
 type ActivePowerups = Record<`${DefensePowerup}Until`, number>;
 
 const difficultyCopy: Record<DefenseDifficulty, { title: string; text: string }> = {
-  easy: { title: "Easy", text: "Медленный темп · 4 жизни" },
-  medium: { title: "Medium", text: "Больше целей · 3 жизни" },
-  hard: { title: "Hard", text: "Высокая скорость · знаки" },
+  easy: { title: "Easy · Легко", text: "Медленный темп / Slow pace · 4 жизни / lives" },
+  medium: { title: "Medium · Средне", text: "Больше целей / More targets · 3 жизни / lives" },
+  hard: { title: "Hard · Сложно", text: "Высокая скорость / High speed · знаки / symbols" },
 };
 
 const waveCopy = [
-  { title: "Разведка", text: "Стандартные сигнатуры" },
-  { title: "Ускорение", text: "Быстрые и бронированные цели" },
-  { title: "Элитный сигнал", text: "Особые цели дают двойные очки" },
-  { title: "Перегрузка", text: "Периметр работает на пределе" },
-  { title: "Критический шторм", text: "Плотность целей максимальна" },
-  { title: "Последний рубеж", text: "Финальная волна" },
+  { title: "Разведка / Recon", text: "Стандартные цели / Standard targets" },
+  { title: "Ускорение / Acceleration", text: "Быстрые и бронированные / Swift and armored" },
+  { title: "Элитный сигнал / Elite signal", text: "Особые цели / Special targets" },
+  { title: "Перегрузка / Overload", text: "Периметр на пределе / System at limit" },
+  { title: "Критический шторм / Critical storm", text: "Максимальная плотность / Maximum density" },
+  { title: "Последний рубеж / Final stand", text: "Финальная волна / Final wave" },
 ] as const;
 
 const powerupCopy: Record<DefensePowerup, { title: string; text: string; hotkey: string }> = {
-  shield: { title: "Щит", text: "8 сек. без урона", hotkey: "1" },
-  freeze: { title: "Заморозка", text: "5 сек. остановки", hotkey: "2" },
-  double: { title: "x2 очки", text: "10 сек. двойных очков", hotkey: "3" },
+  shield: { title: "Щит / Shield", text: "8 сек. без урона / no damage", hotkey: "1" },
+  freeze: { title: "Заморозка / Freeze", text: "5 сек. остановки / stop", hotkey: "2" },
+  double: { title: "x2 очки / score", text: "10 сек. двойных очков / double", hotkey: "3" },
 };
 
 const arenaThemes: Record<ArenaTheme, { title: string; subtitle: string; image: string; icon: typeof Sparkles; frequencies: number[] }> = {
@@ -131,7 +132,7 @@ const laserThemes: Record<DefenseLaserTheme, { beam: string; glow: string }> = {
 
 const PREFERENCES_KEY = "nova-defense-preferences-v1";
 
-export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, ownedArenas, initialLoadout }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean; ownedArenas: DefenseArenaTheme[]; initialLoadout: DefenseLoadout }) {
+export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, ownedArenas, initialLoadout, customMusicUrl }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean; ownedArenas: DefenseArenaTheme[]; initialLoadout: DefenseLoadout; customMusicUrl?: string | null }) {
   const [language, setLanguage] = useState(initialLanguage);
   const [difficulty, setDifficulty] = useState(initialDifficulty);
   const [phaseState, setPhaseState] = useState<Phase>("setup");
@@ -273,8 +274,9 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     if (!musicEnabled) return;
     stopAmbientMusic();
     const selectedMusic = getDefenseShopItemForCategory("music", initialLoadout.music);
-    if (selectedMusic?.audio) {
-      const track = new Audio(selectedMusic.audio.src);
+    const selectedTrack = initialLoadout.music === "custom" ? customMusicUrl : selectedMusic?.audio?.src;
+    if (selectedTrack) {
+      const track = new Audio(selectedTrack);
       track.loop = true;
       track.preload = "auto";
       track.volume = Math.min(1, musicVolume * 0.72);
@@ -320,7 +322,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     master.gain.exponentialRampToValueAtTime(Math.max(0.0001, musicVolume * 0.038), context.currentTime + 0.9);
     filter.connect(compressor).connect(master).connect(context.destination);
     musicRef.current = { gain: master, oscillators, lfo };
-  }, [arena, initialLoadout.music, musicEnabled, musicVolume, stopAmbientMusic]);
+  }, [arena, customMusicUrl, initialLoadout.music, musicEnabled, musicVolume, stopAmbientMusic]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -420,7 +422,8 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     } catch {
       const current = statsRef.current;
       const accuracy = liveAccuracy(current);
-      const rewards = defenseRewards({ ...current, accuracy });
+      const duration = Math.max(1, Math.round(durationMs / 1000));
+      const rewards = defenseRewards({ ...current, accuracy, difficulty, duration });
       setResult({
         id: "local",
         score: current.score,
@@ -429,18 +432,20 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
         destroyed: current.destroyed,
         missed: current.missed,
         maxCombo: current.maxCombo,
-        duration: Math.max(1, Math.round(durationMs / 1000)),
+        duration,
         isRanked: false,
         grade: defenseGrade(accuracy, current.maxCombo, current.destroyed),
         bossesDestroyed: current.bossesDestroyed,
-        rewardCredits: rewards.credits,
+        rewardCredits: 0,
+        rewardBox: null,
+        boxCredits: 0,
         stars: rewards.stars,
         medals: rewards.medals,
       });
       setSaveError(true);
       setPhase("result");
     }
-  }, [setPhase]);
+  }, [difficulty, setPhase]);
 
   const finishMission = useCallback(() => {
     if (phaseRef.current !== "playing" && phaseRef.current !== "paused") return;
@@ -752,16 +757,16 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
       <div className={clsx("pointer-events-none absolute inset-0 z-30 bg-red-500/15 opacity-0 transition-opacity", errorFlash && "opacity-100")} />
 
       <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b border-white/[0.06] bg-[#050809]/72 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <div className="flex items-center gap-2"><Link href="/games" className="icon-button" aria-label="Выйти в игры"><X size={16} /></Link><div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent">NOVA Defense · Beta</div><div className="text-[10px] text-white/40">{arenaThemes[arena].title} · {difficultyCopy[difficulty].title} · {language.toUpperCase()}</div></div></div>
-        <div className="hidden items-center gap-2 lg:flex"><Hud value={`${wave}/${DEFENSE_MAX_WAVES}`} label="Волна" /><Hud value={stats.score.toLocaleString("ru-RU")} label="Очки" accent /><Hud value={`x${stats.combo}`} label="Комбо" /><Hud value={wpm} label="WPM" /><Hud value={`${accuracy.toFixed(0)}%`} label="Точность" /></div>
+        <div className="flex items-center gap-2"><Link href="/games" className="icon-button" aria-label="Выйти / Exit"><X size={16} /></Link><div><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent">NOVA Defense · Beta <span className="rounded border border-cyan-300/15 px-1.5 py-0.5 text-[7px] text-cyan-200/70">RU · EN</span></div><div className="text-[10px] text-white/40">{arenaThemes[arena].title} · {difficultyCopy[difficulty].title} · {language.toUpperCase()}</div></div></div>
+        <div className="hidden items-center gap-2 lg:flex"><Hud value={`${wave}/${DEFENSE_MAX_WAVES}`} label="Волна / Wave" /><Hud value={stats.score.toLocaleString("ru-RU")} label="Очки / Score" accent /><Hud value={`x${stats.combo}`} label="Комбо / Combo" /><Hud value={wpm} label="WPM" /><Hud value={`${accuracy.toFixed(0)}%`} label="Точность / Accuracy" /></div>
         <div className="flex items-center gap-2"><button className={clsx("icon-button", musicEnabled && "!text-cyan-200")} onClick={() => setMusicEnabled((value) => !value)} aria-label={musicEnabled ? "Выключить музыку" : "Включить музыку"}><Music2 size={16} /></button><button className="icon-button" onClick={() => setSoundEnabled((value) => !value)} aria-label="Звуковые эффекты">{soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button><button className="icon-button" onClick={toggleFullscreen} aria-label="Полный экран"><Expand size={16} /></button>{phaseState === "playing" && <button className="icon-button" onClick={() => setPhase("paused")} aria-label="Пауза"><Pause size={16} /></button>}</div>
       </div>
 
       {(phaseState === "playing" || phaseState === "paused" || phaseState === "saving") && <>
         {powerupRemaining.freeze > 0 && <div className="defense-freeze-overlay pointer-events-none absolute inset-0 z-[8] bg-cyan-300/[0.055]" />}
         {powerupRemaining.double > 0 && <div className="defense-double-frame pointer-events-none absolute inset-2 z-[19] rounded-2xl border border-nova-accent/30" />}
-        <div className="absolute left-4 top-[4.8rem] z-20 flex items-center gap-2 rounded-xl border border-white/[0.07] bg-black/35 px-3 py-2 backdrop-blur-md sm:left-6"><div className="flex gap-1">{Array.from({ length: DEFENSE_CONFIG[difficulty].lives }, (_, index) => <Heart key={index} size={15} className={index < stats.lives ? "fill-red-400 text-red-400" : "text-white/15"} />)}</div><span className="text-[10px] uppercase tracking-wider text-white/45">Периметр</span></div>
-        <div className="absolute right-4 top-[4.8rem] z-20 w-48 rounded-xl border border-cyan-300/15 bg-cyan-950/25 px-3 py-2.5 backdrop-blur-md sm:right-6"><div className="flex items-end justify-between gap-3"><div><div className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/40">Волна {wave}</div><div className="mt-0.5 text-xs font-semibold text-cyan-100">{waveCopy[wave - 1].title}</div></div><div className="text-right"><div className="text-sm font-semibold text-cyan-200">x{speedMultiplier.toFixed(2)}</div><div className="text-[8px] uppercase tracking-wider text-cyan-100/35">темп</div></div></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-nova-accent transition-[width] duration-300" style={{ width: `${waveProgress}%` }} /></div></div>
+        <div className="absolute left-4 top-[4.8rem] z-20 flex items-center gap-2 rounded-xl border border-white/[0.07] bg-black/35 px-3 py-2 backdrop-blur-md sm:left-6"><div className="flex gap-1">{Array.from({ length: DEFENSE_CONFIG[difficulty].lives }, (_, index) => <Heart key={index} size={15} className={index < stats.lives ? "fill-red-400 text-red-400" : "text-white/15"} />)}</div><span className="text-[10px] uppercase tracking-wider text-white/45">Периметр / Perimeter</span></div>
+        <div className="absolute right-4 top-[4.8rem] z-20 w-56 rounded-xl border border-cyan-300/15 bg-cyan-950/25 px-3 py-2.5 backdrop-blur-md sm:right-6"><div className="flex items-end justify-between gap-3"><div><div className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/40">Волна / Wave {wave}</div><div className="mt-0.5 text-xs font-semibold text-cyan-100">{waveCopy[wave - 1].title}</div></div><div className="text-right"><div className="text-sm font-semibold text-cyan-200">x{speedMultiplier.toFixed(2)}</div><div className="text-[8px] uppercase tracking-wider text-cyan-100/35">темп / pace</div></div></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-nova-accent transition-[width] duration-300" style={{ width: `${waveProgress}%` }} /></div></div>
 
         <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           {activeTarget && <><line x1="50" y1="93" x2={activeTarget.x + 3} y2={activeTarget.y + 2} stroke={laserTheme.glow} strokeWidth="0.7" /><line x1="50" y1="93" x2={activeTarget.x + 3} y2={activeTarget.y + 2} stroke={laserTheme.beam} strokeWidth="0.16" /></>}
@@ -782,7 +787,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
           {bursts.map((burst) => <div key={burst.id} className={clsx("defense-burst absolute", `defense-burst-${burst.kind}`, `defense-burst-style-${initialLoadout.burst}`)} style={{ left: `${burst.x}%`, top: `${burst.y}%` }} />)}
         </div>
 
-        <div className="absolute inset-x-0 top-[82%] z-10"><div className="defense-perimeter h-px bg-red-400/75 shadow-[0_0_18px_rgba(248,113,113,0.8)]" /><div className="absolute right-4 top-2 text-[8px] font-bold uppercase tracking-[0.22em] text-red-300/75 sm:right-8">Critical perimeter · breach</div></div>
+        <div className="absolute inset-x-0 top-[82%] z-10"><div className="defense-perimeter h-px bg-red-400/75 shadow-[0_0_18px_rgba(248,113,113,0.8)]" /><div className="absolute right-4 top-2 text-[8px] font-bold uppercase tracking-[0.18em] text-red-300/75 sm:right-8">Критический периметр / Critical perimeter</div></div>
         {powerupRemaining.shield > 0 && <div className="defense-shield-field pointer-events-none absolute bottom-[-1.8rem] left-1/2 z-10 h-36 w-72 -translate-x-1/2 rounded-[50%] border border-cyan-200/45 bg-cyan-200/[0.035]" />}
         <div className={clsx("defense-core absolute bottom-[1.2%] left-1/2 z-10 h-16 w-16 -translate-x-1/2 rounded-full border", `defense-core-${initialLoadout.core}`)}><div className="defense-core-ring absolute inset-3 rounded-full border" /><div className="defense-core-gem absolute inset-[1.35rem] rounded-full" /></div>
 
@@ -819,25 +824,26 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
         onStart={() => void startMission()}
       />}
 
-      {phaseState === "countdown" && <div className="absolute inset-0 z-40 grid place-items-center bg-black/35 backdrop-blur-sm"><div className="text-center"><div className="defense-countdown text-8xl font-semibold text-nova-accent drop-shadow-[0_0_35px_rgba(227,182,75,0.6)]">{countdown}</div><div className="mt-4 text-xs font-bold uppercase tracking-[0.3em] text-white/45">Система активируется</div></div></div>}
-      {phaseState === "paused" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/72 px-5 backdrop-blur-lg"><div className="text-center"><Pause className="mx-auto text-nova-accent" size={34} /><h2 className="mt-5 text-3xl font-semibold">Миссия приостановлена</h2><p className="mt-2 text-sm text-white/40">Цели остановлены. Нажмите пробел или продолжите кнопкой.</p><div className="mt-6 flex justify-center gap-3"><button className="nova-button" onClick={() => setPhase("playing")}><Play size={16} /> Продолжить</button><button className="nova-button-secondary" onClick={finishMission}>Завершить</button></div></div></div>}
-      {phaseState === "saving" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/78 backdrop-blur-xl"><div className="text-center"><div className="mx-auto h-11 w-11 animate-spin rounded-full border-2 border-white/10 border-t-nova-accent" /><div className="mt-5 text-sm font-semibold">Формирование отчёта...</div><div className="mt-1 text-xs text-white/35">Результат сохраняется отдельно от обычных тестов</div></div></div>}
+      {phaseState === "countdown" && <div className="absolute inset-0 z-40 grid place-items-center bg-black/35 backdrop-blur-sm"><div className="text-center"><div className="defense-countdown text-8xl font-semibold text-nova-accent drop-shadow-[0_0_35px_rgba(227,182,75,0.6)]">{countdown}</div><div className="mt-4 text-xs font-bold uppercase tracking-[0.25em] text-white/45">Система активируется / System online</div></div></div>}
+      {phaseState === "paused" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/72 px-5 backdrop-blur-lg"><div className="text-center"><Pause className="mx-auto text-nova-accent" size={34} /><h2 className="mt-5 text-3xl font-semibold">Миссия приостановлена / Mission paused</h2><p className="mt-2 text-sm text-white/40">Цели остановлены / Targets are frozen</p><div className="mt-6 flex justify-center gap-3"><button className="nova-button" onClick={() => setPhase("playing")}><Play size={16} /> Продолжить / Resume</button><button className="nova-button-secondary" onClick={finishMission}>Завершить / Finish</button></div></div></div>}
+      {phaseState === "saving" && <div className="absolute inset-0 z-40 grid place-items-center bg-[#020405]/78 backdrop-blur-xl"><div className="text-center"><div className="mx-auto h-11 w-11 animate-spin rounded-full border-2 border-white/10 border-t-nova-accent" /><div className="mt-5 text-sm font-semibold">Формирование отчёта / Building report...</div><div className="mt-1 text-xs text-white/35">Результат сохраняется / Saving your result</div></div></div>}
       {phaseState === "result" && result && <div className="absolute inset-0 z-40 grid place-items-center overflow-y-auto bg-[#020405]/78 px-5 py-8 backdrop-blur-xl">
         <div className="w-full max-w-4xl rounded-[2rem] border border-white/[0.1] bg-[#081012]/92 p-6 shadow-[0_40px_120px_rgba(0,0,0,0.68)] sm:p-9">
           <div className="text-center">
-            <div className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-300">Mission report</div>
+            <div className="inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-300">Отчёт миссии / Mission report</div>
             <h2 className="mt-4 text-2xl font-semibold">Survival · {difficultyCopy[difficulty].title}</h2>
             <div className="mx-auto mt-5 grid h-24 w-24 place-items-center rounded-full border border-cyan-300/35 bg-cyan-300/[0.06] text-5xl font-semibold text-cyan-200 shadow-[0_0_45px_rgba(83,221,235,0.13)]">{result.grade}</div>
             <div className="mt-4 flex justify-center gap-1.5" aria-label={`${result.stars} из 3 звёзд`}>{[1, 2, 3].map((star) => <Star key={star} size={19} className={star <= result.stars ? "fill-nova-accent text-nova-accent drop-shadow-[0_0_8px_rgba(227,182,75,0.48)]" : "text-white/12"} />)}</div>
           </div>
-          <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"><ResultMetric value={result.score.toLocaleString("ru-RU")} label="Очки" accent /><ResultMetric value={result.wpm} label="WPM" /><ResultMetric value={`${result.accuracy.toFixed(0)}%`} label="Точность" /><ResultMetric value={result.destroyed} label="Уничтожено" /><ResultMetric value={`x${result.maxCombo}`} label="Макс. комбо" /><ResultMetric value={formatTime(result.duration)} label="Время" /></div>
+          <div className="mt-7 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"><ResultMetric value={result.score.toLocaleString("ru-RU")} label="Очки / Score" accent /><ResultMetric value={result.wpm} label="WPM" /><ResultMetric value={`${result.accuracy.toFixed(0)}%`} label="Точность / Accuracy" /><ResultMetric value={result.destroyed} label="Цели / Destroyed" /><ResultMetric value={`x${result.maxCombo}`} label="Комбо / Combo" /><ResultMetric value={formatTime(result.duration)} label="Время / Time" /></div>
           <div className="mt-4 grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
             <div className="defense-reward-glow flex items-center justify-between rounded-2xl border border-nova-accent/20 bg-nova-accent/[0.055] p-4"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl border border-nova-accent/20 bg-nova-accent/10 text-nova-accent"><Coins size={21} /></span><span><span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-white/35">Награда миссии</span><span className="mt-1 block text-lg font-semibold text-white">+{result.rewardCredits} NOVA Credits</span></span></div><div className="text-right"><Crown className="ml-auto text-red-200/75" size={17} /><span className="mt-1 block text-xs font-semibold text-white/70">{result.bossesDestroyed} босс.</span></div></div>
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.022] p-4"><div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/35"><Medal size={14} className="text-cyan-200" /> Медали</div><div className="mt-3 flex flex-wrap gap-2">{result.medals.length ? result.medals.map((medal) => <span key={medal} className="rounded-full border border-cyan-300/15 bg-cyan-300/[0.055] px-3 py-1.5 text-[10px] font-semibold text-cyan-100/80">{medal}</span>) : <span className="text-[10px] text-white/28">Следующая медаль откроется после победы над командиром.</span>}</div></div>
           </div>
+          <div className="mt-3">{result.rewardBox ? <LootBoxCard box={result.rewardBox} credits={result.boxCredits} /> : <div className="rounded-xl border border-white/[0.06] bg-white/[0.018] px-4 py-3 text-center text-[10px] text-white/32">NOVA Box не выпал / No box this time · Шанс растёт от WPM, точности и сложности / Chance grows with WPM, accuracy and difficulty</div>}</div>
           <div className="mt-5 text-center text-[10px] text-white/35">{adminMode ? "Очки, кредиты и достижения сохранены в личный прогресс администратора. В рейтинг учеников результат не входит." : result.isRanked ? "Результат добавлен в игровой рейтинг." : "Результат сохранён как тренировочный."}</div>
           {saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-center text-xs text-red-200">Сервер не подтвердил сохранение. <button className="font-semibold underline" onClick={retrySave}>Повторить</button></div>}
-          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button className="nova-button !min-h-12" onClick={() => void startMission()}><RotateCcw size={16} /> Играть снова</button><Link href="/games/shop" className="nova-button-secondary !min-h-12"><ShoppingBag size={16} /> Магазин</Link><Link href="/games" className="nova-button-secondary !min-h-12"><Trophy size={16} /> Рейтинг</Link></div>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button className="nova-button !min-h-12" onClick={() => void startMission()}><RotateCcw size={16} /> Снова / Play again</button><Link href="/games/shop" className="nova-button-secondary !min-h-12"><ShoppingBag size={16} /> Магазин / Shop</Link><Link href="/games" className="nova-button-secondary !min-h-12"><Trophy size={16} /> Рейтинг / Ranking</Link></div>
           <div className="mt-4 text-center text-[9px] uppercase tracking-[0.16em] text-white/25">Enter или Tab — новая миссия</div>
         </div>
       </div>}
@@ -890,25 +896,25 @@ function MissionSetup({
         <section className="relative overflow-hidden border-b border-white/[0.07] p-7 lg:border-b-0 lg:border-r lg:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(227,182,75,0.13),transparent_36%),linear-gradient(160deg,rgba(255,255,255,0.035),transparent_58%)]" />
           <div className="relative flex h-full flex-col">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-nova-accent/20 bg-nova-accent/[0.08] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] text-nova-accent"><Shield size={12} /> Mission control</div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-nova-accent/20 bg-nova-accent/[0.08] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.22em] text-nova-accent"><Shield size={12} /> Управление / Mission control</div>
             <div className="mt-8 grid h-16 w-16 place-items-center rounded-2xl border border-nova-accent/25 bg-nova-accent/10 text-nova-accent shadow-[0_0_38px_rgba(227,182,75,0.13)]"><Shield size={29} /></div>
-            <h1 className="mt-6 max-w-md text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl">Защита<br /><span className="text-nova-accent">периметра</span></h1>
-            <p className="mt-4 max-w-md text-sm leading-6 text-white/48">Выберите арену и режим. Печатайте падающие цели, создавайте комбо и не позволяйте им пройти критическую линию.</p>
+            <h1 className="mt-6 max-w-md text-4xl font-semibold tracking-[-0.055em] text-white sm:text-5xl">Защита периметра<br /><span className="text-nova-accent">Perimeter Defense</span></h1>
+            <p className="mt-4 max-w-md text-sm leading-6 text-white/48">Печатайте падающие цели, создавайте комбо и защищайте линию.<br /><span className="text-white/30">Type falling targets, build combos and defend the line.</span></p>
             <div className="mt-8 grid gap-2 text-[11px] text-white/48 sm:grid-cols-2 lg:grid-cols-1">
-              <SetupFeature number="01" title="Шесть волн" text="Каждая волна быстрее предыдущей" />
-              <SetupFeature number="02" title="Командиры" text="Три слоя защиты и усиленная награда" />
-              <SetupFeature number="03" title="Три боевых бонуса" text="Щит, заморозка и двойные очки" />
-              <SetupFeature number="04" title="Награды" text="Звёзды, медали и NOVA Credits" />
+              <SetupFeature number="01" title="Шесть волн / Six waves" text="Каждая волна быстрее / Each wave is faster" />
+              <SetupFeature number="02" title="Командиры / Bosses" text="Три слоя защиты / Three armor layers" />
+              <SetupFeature number="03" title="Бонусы / Power-ups" text="Щит, заморозка и x2 / Shield, freeze and x2" />
+              <SetupFeature number="04" title="Награды / Rewards" text="Звёзды, медали и NOVA Box" />
             </div>
             <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.4</div>
           </div>
         </section>
 
         <section className="p-6 sm:p-8 lg:p-10">
-            <div className="flex items-end justify-between gap-4"><div><p className="page-eyebrow">Подготовка миссии</p><h2 className="mt-1 text-xl font-semibold">Настройте свою арену</h2></div><Link href="/games/shop" className="nova-badge inline-flex items-center gap-1.5"><ShoppingBag size={11} /> Магазин</Link></div>
+            <div className="flex items-end justify-between gap-4"><div><p className="page-eyebrow">Подготовка / Mission setup</p><h2 className="mt-1 text-xl font-semibold">Настройте арену / Configure arena</h2></div><Link href="/games/shop" className="nova-badge inline-flex items-center gap-1.5"><ShoppingBag size={11} /> Магазин / Shop</Link></div>
 
           <div className="mt-6">
-            <SettingLabel title="Арена" hint="Выберите атмосферу боя" />
+            <SettingLabel title="Арена / Arena" hint="Атмосфера / Theme" />
             <div className="mt-2 grid grid-cols-3 gap-2">
               {(Object.keys(arenaThemes) as ArenaTheme[]).map((item) => {
                 const theme = arenaThemes[item];
@@ -926,19 +932,19 @@ function MissionSetup({
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-[8rem_1fr]">
-            <div><SettingLabel title="Язык" hint="Цели" /><div className="mt-2 grid grid-cols-2 gap-2">{(["en", "ru"] as DefenseLanguage[]).map((item) => <button key={item} type="button" onClick={() => onLanguageChange(item)} className={language === item ? "test-option test-option-active uppercase" : "test-option border border-white/[0.06] uppercase"}>{item}</button>)}</div></div>
-            <div><SettingLabel title="Сложность" hint="Темп атаки" /><div className="mt-2 grid grid-cols-3 gap-2">{(["easy", "medium", "hard"] as DefenseDifficulty[]).map((item) => <button key={item} type="button" onClick={() => onDifficultyChange(item)} className={clsx("rounded-xl border px-3 py-2.5 text-left transition", difficulty === item ? "border-nova-accent/35 bg-nova-accent/10" : "border-white/[0.07] bg-white/[0.025] hover:border-white/15")}><span className={difficulty === item ? "block text-xs font-semibold text-nova-accent" : "block text-xs font-semibold text-white/72"}>{difficultyCopy[item].title}</span><span className="mt-1 hidden text-[8px] text-white/32 sm:block">{item === "easy" ? "4 жизни" : item === "medium" ? "3 жизни" : "Знаки · 3 жизни"}</span></button>)}</div></div>
+            <div><SettingLabel title="Язык / Language" hint="Цели / Targets" /><div className="mt-2 grid grid-cols-2 gap-2">{(["en", "ru"] as DefenseLanguage[]).map((item) => <button key={item} type="button" onClick={() => onLanguageChange(item)} className={language === item ? "test-option test-option-active uppercase" : "test-option border border-white/[0.06] uppercase"}>{item}</button>)}</div></div>
+            <div><SettingLabel title="Сложность / Difficulty" hint="Темп / Pace" /><div className="mt-2 grid grid-cols-3 gap-2">{(["easy", "medium", "hard"] as DefenseDifficulty[]).map((item) => <button key={item} type="button" onClick={() => onDifficultyChange(item)} className={clsx("rounded-xl border px-3 py-2.5 text-left transition", difficulty === item ? "border-nova-accent/35 bg-nova-accent/10" : "border-white/[0.07] bg-white/[0.025] hover:border-white/15")}><span className={difficulty === item ? "block text-[10px] font-semibold text-nova-accent" : "block text-[10px] font-semibold text-white/72"}>{difficultyCopy[item].title}</span><span className="mt-1 hidden text-[8px] text-white/32 sm:block">{item === "easy" ? "4 жизни / lives" : item === "medium" ? "3 жизни / lives" : "Знаки / symbols · 3"}</span></button>)}</div></div>
           </div>
 
           <div className="mt-5 rounded-2xl border border-white/[0.07] bg-black/15 p-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <AudioControl icon={<Music2 size={15} />} title="Музыка" enabled={musicEnabled} volume={musicVolume} onEnabledChange={onMusicEnabledChange} onVolumeChange={onMusicVolumeChange} />
-              <AudioControl icon={soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />} title="Эффекты" enabled={soundEnabled} volume={effectsVolume} onEnabledChange={onSoundEnabledChange} onVolumeChange={onEffectsVolumeChange} />
+              <AudioControl icon={<Music2 size={15} />} title="Музыка / Music" enabled={musicEnabled} volume={musicVolume} onEnabledChange={onMusicEnabledChange} onVolumeChange={onMusicVolumeChange} />
+              <AudioControl icon={soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />} title="Эффекты / Effects" enabled={soundEnabled} volume={effectsVolume} onEnabledChange={onSoundEnabledChange} onVolumeChange={onEffectsVolumeChange} />
             </div>
           </div>
 
           {saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-center text-xs text-red-200">Не удалось подготовить миссию. Проверьте соединение и попробуйте снова.</div>}
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button onClick={onStart} disabled={loading} className="nova-button !min-h-12 !flex-1 !rounded-xl"><Gamepad2 size={17} />{loading ? "Подготовка арены..." : "Запустить миссию"}</button><Link href="/games" className="nova-button-secondary !min-h-12 !rounded-xl">Назад</Link></div>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row"><button onClick={onStart} disabled={loading} className="nova-button !min-h-12 !flex-1 !rounded-xl"><Gamepad2 size={17} />{loading ? "Подготовка / Loading..." : "Запустить / Start mission"}</button><Link href="/games" className="nova-button-secondary !min-h-12 !rounded-xl">Назад / Back</Link></div>
         </section>
       </div>
     </div>
@@ -987,6 +993,19 @@ function SettingLabel({ title, hint }: { title: string; hint: string }) {
 
 function AudioControl({ icon, title, enabled, volume, onEnabledChange, onVolumeChange }: { icon: React.ReactNode; title: string; enabled: boolean; volume: number; onEnabledChange: (enabled: boolean) => void; onVolumeChange: (volume: number) => void }) {
   return <div><div className="flex items-center justify-between"><button type="button" onClick={() => onEnabledChange(!enabled)} className={clsx("flex items-center gap-2 text-[11px] font-semibold transition", enabled ? "text-cyan-200" : "text-white/35")}>{icon}{title}</button><span className="font-mono text-[9px] text-white/28">{enabled ? `${Math.round(volume * 100)}%` : "Выкл"}</span></div><input aria-label={`Громкость: ${title}`} className="defense-volume mt-3 w-full" type="range" min="0" max="100" step="1" disabled={!enabled} value={Math.round(volume * 100)} onChange={(event) => onVolumeChange(clampVolume(Number(event.target.value) / 100))} /></div>;
+}
+
+function LootBoxCard({ box, credits }: { box: DefenseRewardBox; credits: number }) {
+  const copy = box === "legendary"
+    ? { title: "Легендарный / Legendary", style: "border-amber-300/35 from-amber-300/18 via-orange-400/[0.07] to-transparent text-amber-200" }
+    : box === "epic"
+      ? { title: "Эпический / Epic", style: "border-fuchsia-300/30 from-fuchsia-400/16 via-violet-500/[0.07] to-transparent text-fuchsia-200" }
+      : box === "rare"
+        ? { title: "Редкий / Rare", style: "border-cyan-300/28 from-cyan-300/14 via-blue-500/[0.06] to-transparent text-cyan-200" }
+        : { title: "Обычный / Common", style: "border-emerald-300/22 from-emerald-300/12 via-emerald-500/[0.04] to-transparent text-emerald-200" };
+  return <div className={clsx("defense-loot-box relative overflow-hidden rounded-2xl border bg-gradient-to-r p-4", copy.style)}>
+    <div className="relative flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-xl border border-current/20 bg-black/20 shadow-[0_0_24px_currentColor]"><PackageOpen size={23} /></span><span><span className="block text-[9px] font-bold uppercase tracking-[0.22em] opacity-60">NOVA BOX найден / Found</span><span className="mt-1 block text-base font-semibold text-white">{copy.title}</span></span></div><div className="text-right"><div className="text-xl font-semibold">+{credits}</div><div className="text-[8px] uppercase tracking-wider opacity-60">кредитов / credits</div></div></div>
+  </div>;
 }
 
 function emptyStats(difficulty: DefenseDifficulty): LiveStats {

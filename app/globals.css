@@ -600,6 +600,18 @@ button.data-card:hover {
   animation: defense-reward-glow 2s ease-in-out infinite;
 }
 
+.defense-loot-box {
+  animation: defense-loot-box 2.4s ease-in-out infinite;
+}
+
+.defense-loot-box::before {
+  position: absolute;
+  inset: -45%;
+  content: "";
+  background: conic-gradient(from 30deg, transparent, rgb(255 255 255 / 0.16), transparent 22%);
+  animation: defense-loot-shine 4.5s linear infinite;
+}
+
 .defense-countdown {
   animation: defense-countdown 880ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -707,6 +719,15 @@ button.data-card:hover {
 @keyframes defense-reward-glow {
   0%, 100% { box-shadow: 0 0 0 rgb(227 182 75 / 0); }
   50% { box-shadow: 0 0 30px rgb(227 182 75 / 0.08); }
+}
+
+@keyframes defense-loot-box {
+  0%, 100% { box-shadow: 0 0 24px rgb(227 182 75 / 0.06); transform: translateY(0); }
+  50% { box-shadow: 0 0 42px rgb(227 182 75 / 0.14); transform: translateY(-2px); }
+}
+
+@keyframes defense-loot-shine {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes defense-wave-banner {

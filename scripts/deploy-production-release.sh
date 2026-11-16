@@ -24,6 +24,8 @@ mkdir -p "$release_dir/.next"
 cp -a .next/standalone/. "$release_dir/"
 cp -a public "$release_dir/public"
 cp -a .next/static "$release_dir/.next/static"
+mkdir -p "$app_root/shared/uploads"
+ln -sfn "$app_root/shared/uploads" "$release_dir/public/uploads"
 
 ln -sfn "$release_dir" "$app_root/current.new"
 mv -Tf "$app_root/current.new" "$app_root/current"

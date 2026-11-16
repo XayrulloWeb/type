@@ -55,6 +55,8 @@ model GameResult {
   errorCount       Int
   bossesDestroyed  Int       @default(0)
   rewardCredits    Int       @default(0)
+  rewardBox        String?
+  boxCredits       Int       @default(0)
   isRanked         Boolean   @default(true)
   moderationStatus String? // "annulled" or "restored"
   moderationReason String?
@@ -91,6 +93,8 @@ model GameLoadout {
   frame        String   @default("none")
   banner       String   @default("none")
   profileTitle String   @default("rookie")
+  customAvatarUrl String?
+  customMusicUrl  String?
   updatedAt    DateTime @updatedAt
 }
 

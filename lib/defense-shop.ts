@@ -2,8 +2,8 @@ export type DefenseArenaTheme = "nova" | "cyber" | "ice";
 export type DefenseLaserTheme = "cyan" | "solar" | "plasma" | "toxic";
 export type DefenseCoreTheme = "nova" | "obsidian" | "royal" | "quantum";
 export type DefenseBurstTheme = "spark" | "nova" | "thunder" | "void";
-export type DefenseMusicTheme = "adaptive" | "cipher" | "lightless" | "impact";
-export type ProfileAvatarTheme = "initials" | "cadet" | "fox";
+export type DefenseMusicTheme = "adaptive" | "cipher" | "lightless" | "impact" | "custom";
+export type ProfileAvatarTheme = "initials" | "cadet" | "fox" | "custom";
 export type ProfileFrameTheme = "none" | "solar" | "plasma" | "legend";
 export type ProfileBannerTheme = "none" | "orbital" | "neon";
 export type ProfileTitleTheme = "rookie" | "record" | "storm" | "legend";
@@ -89,7 +89,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     description: "Неоновая арена с холодным кибер-звучанием и атмосферой ночного города.",
     image: "/games/nova-defense-cyber-city.webp",
     preview: "linear-gradient(135deg,#06171c,#22d3ee)",
-    price: 80,
+    price: 650,
     rarity: "rare",
   },
   {
@@ -101,7 +101,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     description: "Редкая ледяная цитадель с ярким ядром и собственной спокойной музыкой.",
     image: "/games/nova-defense-ice-citadel.webp",
     preview: "linear-gradient(135deg,#08121f,#93c5fd)",
-    price: 140,
+    price: 1_400,
     rarity: "epic",
   },
   {
@@ -124,7 +124,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Солнечное копьё",
     description: "Золотой луч с мощным янтарным ореолом вокруг цели.",
     preview: "linear-gradient(135deg,#100b02 20%,#fbbf24 50%,#100b02 80%)",
-    price: 55,
+    price: 300,
     rarity: "rare",
   },
   {
@@ -135,7 +135,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Разлом плазмы",
     description: "Фиолетовый плазменный след из экспериментальной лаборатории.",
     preview: "linear-gradient(135deg,#12051d 20%,#d946ef 50%,#12051d 80%)",
-    price: 75,
+    price: 600,
     rarity: "epic",
   },
   {
@@ -146,7 +146,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Изумрудный импульс",
     description: "Яркий зелёный луч с радиоактивным свечением.",
     preview: "linear-gradient(135deg,#03140a 20%,#4ade80 50%,#03140a 80%)",
-    price: 95,
+    price: 900,
     rarity: "epic",
   },
   {
@@ -169,7 +169,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Тёмная материя",
     description: "Чёрное сердце с красным контуром и тяжёлым пульсом.",
     preview: "radial-gradient(circle,#fb7185 0 8%,#19070a 9% 28%,#ef4444 29% 31%,#070b0d 32%)",
-    price: 100,
+    price: 750,
     rarity: "rare",
   },
   {
@@ -180,7 +180,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Императорский заряд",
     description: "Пурпурно-золотой реактор для опытных командиров.",
     preview: "radial-gradient(circle,#fde68a 0 8%,#7e22ce 9% 28%,#e879f9 29% 31%,#09040f 32%)",
-    price: 130,
+    price: 1_200,
     rarity: "epic",
   },
   {
@@ -191,7 +191,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Живая звезда",
     description: "Легендарное бело-голубое ядро с квантовым ореолом.",
     preview: "radial-gradient(circle,#ffffff 0 8%,#67e8f9 9% 27%,#2563eb 28% 31%,#030712 32%)",
-    price: 220,
+    price: 2_200,
     rarity: "legendary",
   },
   {
@@ -214,7 +214,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Звёздный цветок",
     description: "Золотая сверхновая раскрывается на месте уничтоженной цели.",
     preview: "repeating-conic-gradient(from 0deg,#fbbf24 0 8deg,transparent 8deg 28deg)",
-    price: 65,
+    price: 400,
     rarity: "rare",
   },
   {
@@ -225,7 +225,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Разряд молнии",
     description: "Электрический разлом с несколькими синими импульсами.",
     preview: "repeating-conic-gradient(from 10deg,#60a5fa 0 4deg,transparent 4deg 24deg)",
-    price: 90,
+    price: 850,
     rarity: "epic",
   },
   {
@@ -236,7 +236,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Схлопывание пустоты",
     description: "Легендарная тёмная воронка поглощает уничтоженную цель.",
     preview: "radial-gradient(circle,#020205 0 18%,#a855f7 20% 23%,#312e81 27% 34%,transparent 45%)",
-    price: 150,
+    price: 1_600,
     rarity: "legendary",
   },
   {
@@ -259,7 +259,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Яркий электронный ритм",
     description: "Быстрый электронный трек для серии точных ударов и рекордных комбо.",
     preview: "linear-gradient(135deg,#06131d,#06b6d4 48%,#7c3aed)",
-    price: 90,
+    price: 800,
     rarity: "rare",
     audio: {
       src: "/audio/nova/cipher.mp3",
@@ -276,7 +276,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Тактический грув",
     description: "Спокойное вступление с ударными и синтезаторами для сосредоточенной игры.",
     preview: "linear-gradient(135deg,#111827,#f59e0b 52%,#451a03)",
-    price: 120,
+    price: 1_300,
     rarity: "epic",
     audio: {
       src: "/audio/nova/impact-prelude.mp3",
@@ -293,7 +293,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Тёмная орбита",
     description: "Атмосферный кинематографичный трек для самых напряжённых волн защиты.",
     preview: "linear-gradient(135deg,#020617,#312e81 46%,#7e22ce)",
-    price: 160,
+    price: 2_100,
     rarity: "legendary",
     audio: {
       src: "/audio/nova/lightless-dawn.mp3",
@@ -301,6 +301,17 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
       sourceUrl: "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100655",
       licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
     },
+  },
+  {
+    id: "music-custom",
+    category: "music",
+    value: "custom",
+    title: "My NOVA Track",
+    subtitle: "Ваша личная музыка",
+    description: "Откройте редчайший слот и загрузите собственный MP3-трек. Музыка будет доступна только в вашем аккаунте.",
+    preview: "radial-gradient(circle at 50% 50%,#ffffff 0 3%,transparent 4%),repeating-radial-gradient(circle at 50% 50%,#d946ef44 0 2px,transparent 3px 13px),linear-gradient(135deg,#020617,#7e22ce,#0891b2)",
+    price: 5_000,
+    rarity: "legendary",
   },
   {
     id: "default-avatar-initials",
@@ -323,7 +334,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     description: "Оригинальный аватар юного исследователя с золотым свечением шлема.",
     image: "/profile-shop/avatar-cosmic-cadet.webp",
     preview: "linear-gradient(135deg,#071521,#e3b64b)",
-    price: 85,
+    price: 950,
     rarity: "rare",
   },
   {
@@ -335,8 +346,19 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     description: "Коллекционный неоновый хранитель для тех, кто печатает быстро и точно.",
     image: "/profile-shop/avatar-cyber-fox.webp",
     preview: "linear-gradient(135deg,#111827,#06b6d4,#a855f7)",
-    price: 135,
+    price: 1_700,
     rarity: "epic",
+  },
+  {
+    id: "avatar-custom",
+    category: "avatar",
+    value: "custom",
+    title: "My NOVA Avatar",
+    subtitle: "Ваше личное изображение",
+    description: "Откройте персональный слот и загрузите собственное фото или рисунок. Изображение автоматически обрежется под безопасный квадрат.",
+    preview: "linear-gradient(135deg,#0f172a,#c026d3 48%,#22d3ee)",
+    price: 3_000,
+    rarity: "legendary",
   },
   {
     id: "default-frame-none",
@@ -358,7 +380,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Золотая орбита",
     description: "Двойное золотое кольцо и мягкое солнечное сияние вокруг аватара.",
     preview: "radial-gradient(circle,transparent 0 34%,#fbbf24 36% 40%,transparent 42% 48%,#fde68a 50% 53%,#120d03 55%)",
-    price: 60,
+    price: 500,
     rarity: "rare",
   },
   {
@@ -369,7 +391,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Фиолетовый разряд",
     description: "Яркий плазменный контур с голубыми искрами.",
     preview: "radial-gradient(circle,transparent 0 34%,#22d3ee 36% 39%,#d946ef 41% 45%,transparent 47%,#11051a 58%)",
-    price: 95,
+    price: 1_000,
     rarity: "epic",
   },
   {
@@ -380,7 +402,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Рамка легенды",
     description: "Легендарное сочетание золота, белого света и звёздного ореола.",
     preview: "radial-gradient(circle,transparent 0 32%,#fff 34% 36%,#fbbf24 38% 42%,#60a5fa 44% 47%,transparent 50%),#05070b",
-    price: 170,
+    price: 1_900,
     rarity: "legendary",
   },
   {
@@ -404,7 +426,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     description: "Панорамная космическая обложка с планетой, обсерваторией и потоками энергии.",
     image: "/profile-shop/banner-orbital-observatory.webp",
     preview: "linear-gradient(120deg,#061323,#2563eb,#e3b64b)",
-    price: 125,
+    price: 1_200,
     rarity: "epic",
   },
   {
@@ -416,7 +438,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     description: "Неоновый мегаполис из мира Typing Defense теперь становится обложкой профиля.",
     image: "/games/nova-defense-cyber-city.webp",
     preview: "linear-gradient(120deg,#020617,#0891b2,#c026d3)",
-    price: 150,
+    price: 2_100,
     rarity: "legendary",
   },
   {
@@ -439,7 +461,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Редкий титул",
     description: "Для тех, кто всегда возвращается за новым личным рекордом.",
     preview: "linear-gradient(135deg,#05131a,#0891b2)",
-    price: 50,
+    price: 450,
     rarity: "rare",
   },
   {
@@ -450,7 +472,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Эпический титул",
     description: "Заметная подпись для мастера быстрых и точных серий.",
     preview: "linear-gradient(135deg,#1e1b4b,#7c3aed,#22d3ee)",
-    price: 90,
+    price: 950,
     rarity: "epic",
   },
   {
@@ -461,7 +483,7 @@ export const DEFENSE_SHOP_ITEMS: readonly DefenseShopItem[] = [
     subtitle: "Высший титул",
     description: "Самое редкое звание коллекции — золотая подпись владельца большого арсенала.",
     preview: "linear-gradient(135deg,#2a1802,#fbbf24,#fff7c2)",
-    price: 190,
+    price: 2_600,
     rarity: "legendary",
   },
 ] as const;
@@ -503,6 +525,10 @@ export function normalizeDefenseLoadout(loadout: Partial<Record<keyof DefenseLoa
 
 export function loadoutUpdateForItem(item: DefenseShopItem) {
   return { [item.category]: item.value } as Partial<Record<keyof DefenseLoadout, string>>;
+}
+
+export function isCustomUploadItem(item: DefenseShopItem) {
+  return item.id === "avatar-custom" || item.id === "music-custom";
 }
 
 function isCatalogValue(category: DefenseShopCategory, value: string | undefined): value is string {

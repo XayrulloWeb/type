@@ -2,6 +2,7 @@ export type DefenseLanguage = "ru" | "en";
 export type DefenseDifficulty = "easy" | "medium" | "hard";
 export type DefenseTargetKind = "normal" | "swift" | "armored" | "special" | "boss";
 export type DefensePowerup = "shield" | "freeze" | "double";
+export type DefenseRewardBox = "common" | "rare" | "epic" | "legendary";
 
 export type DefenseEvent =
   | { type: "hit"; wordIndex: number; charIndex: number; atMs: number }
@@ -23,6 +24,8 @@ export interface DefenseSavedResult {
   grade: string;
   bossesDestroyed: number;
   rewardCredits: number;
+  rewardBox: DefenseRewardBox | null;
+  boxCredits: number;
   stars: number;
   medals: string[];
 }
@@ -42,11 +45,11 @@ export const DEFENSE_POWERUP_DURATION_MS = {
 } satisfies Record<DefensePowerup, number>;
 
 export const DEFENSE_TARGETS = {
-  normal: { label: "Обычная", shortLabel: "СТАНДАРТ", speedMultiplier: 1, scoreMultiplier: 1, breachDamage: 1 },
-  swift: { label: "Быстрая", shortLabel: "БЫСТРАЯ", speedMultiplier: 1.55, scoreMultiplier: 1.25, breachDamage: 1 },
-  armored: { label: "Бронированная", shortLabel: "БРОНЯ", speedMultiplier: 0.74, scoreMultiplier: 1.6, breachDamage: 2 },
-  special: { label: "Особая", shortLabel: "ОСОБАЯ", speedMultiplier: 1.1, scoreMultiplier: 2, breachDamage: 1 },
-  boss: { label: "Командир", shortLabel: "КОМАНДИР", speedMultiplier: 0.42, scoreMultiplier: 4.5, breachDamage: 3 },
+  normal: { label: "Обычная / Normal", shortLabel: "СТАНДАРТ / NORMAL", speedMultiplier: 1, scoreMultiplier: 1, breachDamage: 1 },
+  swift: { label: "Быстрая / Swift", shortLabel: "БЫСТРАЯ / SWIFT", speedMultiplier: 1.55, scoreMultiplier: 1.25, breachDamage: 1 },
+  armored: { label: "Бронированная / Armored", shortLabel: "БРОНЯ / ARMOR", speedMultiplier: 0.74, scoreMultiplier: 1.6, breachDamage: 2 },
+  special: { label: "Особая / Special", shortLabel: "ОСОБАЯ / SPECIAL", speedMultiplier: 1.1, scoreMultiplier: 2, breachDamage: 1 },
+  boss: { label: "Командир / Boss", shortLabel: "КОМАНДИР / BOSS", speedMultiplier: 0.42, scoreMultiplier: 4.5, breachDamage: 3 },
 } satisfies Record<DefenseTargetKind, { label: string; shortLabel: string; speedMultiplier: number; scoreMultiplier: number; breachDamage: number }>;
 
 const difficultyScoreMultiplier: Record<DefenseDifficulty, number> = { easy: 1, medium: 1.2, hard: 1.45 };
@@ -100,7 +103,7 @@ export function defenseGrade(accuracy: number, maxCombo: number, destroyed: numb
   return "D";
 }
 
-export function defenseRewards({ accuracy, bossesDestroyed, destroyed, maxCombo, missed, score }: { accuracy: number; bossesDestroyed: number; destroyed: number; maxCombo: number; missed: number; score: number }) {
+export function defenseRewards({ accuracy, bossesDestroyed, destroyed, duration, difficulty, maxCombo, missed }: { accuracy: number; bossesDestroyed: number; destroyed: number; duration: number; difficulty: DefenseDifficulty; maxCombo: number; missed: number }) {
   let stars = 1;
   if (destroyed >= 12 && accuracy >= 82) stars = 2;
   if (destroyed >= 24 && accuracy >= 92 && bossesDestroyed >= 2) stars = 3;
@@ -111,6 +114,23 @@ export function defenseRewards({ accuracy, bossesDestroyed, destroyed, maxCombo,
   if (destroyed >= 5 && accuracy >= 95) medals.push("Точный стрелок");
   if (maxCombo >= 20) medals.push("Мастер комбо");
 
-  const credits = Math.max(1, Math.min(9_999, Math.floor(score / 200) + bossesDestroyed * 12 + (stars - 1) * 5));
+  const qualifiesForCredits = duration >= 45 && destroyed >= 10 && accuracy >= 80;
+  const difficultyBonus = difficulty === "hard" ? 2 : difficulty === "medium" ? 1 : 0;
+  const credits = qualifiesForCredits ? 1 + (stars - 1) + difficultyBonus + Math.min(2, bossesDestroyed) : 0;
   return { credits, medals, stars };
+}
+
+export function defenseBoxReward({ accuracy, destroyed, difficulty, duration, stars, wpm, roll }: { accuracy: number; destroyed: number; difficulty: DefenseDifficulty; duration: number; stars: number; wpm: number; roll: number }): { box: DefenseRewardBox | null; credits: number } {
+  if (duration < 60 || destroyed < 12 || accuracy < 85) return { box: null, credits: 0 };
+
+  const difficultyChance = difficulty === "hard" ? 0.07 : difficulty === "medium" ? 0.035 : 0;
+  const chance = Math.min(0.35, 0.035 + Math.min(0.15, wpm / 420) + difficultyChance + (stars - 1) * 0.025);
+  const normalizedRoll = Math.max(0, Math.min(0.999_999, roll));
+  if (normalizedRoll >= chance) return { box: null, credits: 0 };
+
+  const rarityRoll = normalizedRoll / chance;
+  if (wpm >= 55 && accuracy >= 96 && difficulty === "hard" && rarityRoll < 0.025) return { box: "legendary", credits: 80 };
+  if (wpm >= 40 && accuracy >= 93 && rarityRoll < 0.13) return { box: "epic", credits: 30 };
+  if (rarityRoll < 0.42) return { box: "rare", credits: 12 };
+  return { box: "common", credits: 5 };
 }

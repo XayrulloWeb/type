@@ -22,6 +22,7 @@
 /backups
 /outputs
 /tmp
+/public/uploads/
 
 # local agent metadata
 /.agents

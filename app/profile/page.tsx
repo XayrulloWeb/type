@@ -45,6 +45,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const banner = getDefenseShopItemForCategory("banner", loadout.banner);
   const profileTitle = getDefenseShopItemForCategory("profileTitle", loadout.profileTitle);
   const bannerStyle = banner?.image ? { backgroundImage: `url(${banner.image})` } : { background: banner?.preview };
+  const avatarImage = loadout.avatar === "custom" ? user.gameLoadout?.customAvatarUrl : avatar?.image;
   const selectedTests = tests.filter((test) => test.difficulty === difficulty);
   const ranked = selectedTests.filter((test) => test.isRanked);
   const bestWpm = ranked.length ? Math.max(...ranked.map((test) => test.wpm)) : 0;
@@ -72,8 +73,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-nova-accent/[0.09] blur-3xl" />
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
         <div className={profileFrameClass(loadout.frame)}>
-          {avatar?.image
-            ? <Image src={avatar.image} alt={avatar.title} width={96} height={96} className="h-full w-full rounded-[1.05rem] object-cover" priority />
+          {avatarImage
+            ? <Image src={avatarImage} alt={avatar?.title ?? "NOVA avatar"} width={96} height={96} className="h-full w-full rounded-[1.05rem] object-cover" priority unoptimized={loadout.avatar === "custom"} />
             : <span>{user.firstName[0]}{user.lastName[0]}</span>}
         </div>
         <div className="flex-1">
