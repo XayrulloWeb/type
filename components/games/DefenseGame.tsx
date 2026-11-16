@@ -121,6 +121,27 @@ const arenaThemes: Record<ArenaTheme, { title: string; subtitle: string; image: 
     icon: Snowflake,
     frequencies: [130.81, 196, 261.63],
   },
+  aurora: {
+    title: "Aurora Taiga",
+    subtitle: "Северное сияние",
+    image: "/games/nova-defense-aurora-taiga.webp",
+    icon: Snowflake,
+    frequencies: [146.83, 220, 293.66],
+  },
+  forge: {
+    title: "Crimson Forge",
+    subtitle: "Огненная кузница",
+    image: "/games/nova-defense-crimson-forge.webp",
+    icon: Sparkles,
+    frequencies: [82.41, 123.47, 164.81],
+  },
+  abyss: {
+    title: "Abyss Academy",
+    subtitle: "Подводная академия",
+    image: "/games/nova-defense-abyss-academy.webp",
+    icon: Building2,
+    frequencies: [98, 174.61, 261.63],
+  },
 };
 
 const laserThemes: Record<DefenseLaserTheme, { beam: string; glow: string }> = {
@@ -128,6 +149,9 @@ const laserThemes: Record<DefenseLaserTheme, { beam: string; glow: string }> = {
   solar: { beam: "#fbbf24", glow: "rgba(251,191,36,0.34)" },
   plasma: { beam: "#e879f9", glow: "rgba(217,70,239,0.34)" },
   toxic: { beam: "#4ade80", glow: "rgba(74,222,128,0.34)" },
+  aurora: { beam: "#6ee7b7", glow: "rgba(34,211,238,0.38)" },
+  ember: { beam: "#fde68a", glow: "rgba(249,115,22,0.5)" },
+  prism: { beam: "#ffffff", glow: "rgba(167,139,250,0.52)" },
 };
 
 const PREFERENCES_KEY = "nova-defense-preferences-v1";
@@ -906,7 +930,7 @@ function MissionSetup({
               <SetupFeature number="03" title="Бонусы / Power-ups" text="Щит, заморозка и x2 / Shield, freeze and x2" />
               <SetupFeature number="04" title="Награды / Rewards" text="Звёзды, медали и NOVA Box" />
             </div>
-            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.4</div>
+            <div className="mt-auto hidden pt-8 text-[9px] uppercase tracking-[0.18em] text-white/20 lg:block">NOVA Defense Systems · Beta 1.6</div>
           </div>
         </section>
 

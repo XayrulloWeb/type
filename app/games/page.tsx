@@ -35,13 +35,16 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
     <section className="relative overflow-hidden rounded-[2rem] border border-nova-accent/15 bg-[#101416] shadow-[0_35px_100px_rgba(0,0,0,0.42)]">
       <div className="absolute inset-0 bg-[url('/games/nova-defense-arena.webp')] bg-cover bg-center opacity-75" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#080b0d]/96 via-[#080b0d]/72 to-[#080b0d]/15" />
-      <div className="absolute bottom-8 right-8 top-8 hidden w-[23rem] grid-cols-1 gap-2 xl:grid">
+      <div className="absolute bottom-8 right-8 top-8 hidden w-[32rem] grid-cols-2 gap-2 xl:grid">
         <ArenaPreview image="/games/nova-defense-arena.webp" title="NOVA Prime" subtitle="Золотое ядро" />
         <ArenaPreview image="/games/nova-defense-cyber-city.webp" title="Neon City" subtitle="Ночной мегаполис" />
         <ArenaPreview image="/games/nova-defense-ice-citadel.webp" title="Ice Citadel" subtitle="Ледяное сияние" />
+        <ArenaPreview image="/games/nova-defense-aurora-taiga.webp" title="Aurora Taiga" subtitle="Северное сияние" />
+        <ArenaPreview image="/games/nova-defense-crimson-forge.webp" title="Crimson Forge" subtitle="Огненная кузница" />
+        <ArenaPreview image="/games/nova-defense-abyss-academy.webp" title="Abyss Academy" subtitle="Подводная станция" />
       </div>
       <div className="relative max-w-2xl px-7 py-14 sm:px-12 sm:py-20">
-        <div className="inline-flex items-center gap-2 rounded-full border border-nova-accent/25 bg-nova-accent/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent"><Sparkles size={12} /> Beta 1.5 · игровая лаборатория</div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-nova-accent/25 bg-nova-accent/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-nova-accent"><Sparkles size={12} /> Beta 1.6 · 66 предметов</div>
         <h1 className="mt-6 text-4xl font-semibold tracking-[-0.055em] text-white sm:text-6xl">NOVA Defense</h1>
         <p className="mt-4 max-w-xl text-sm leading-7 text-white/65 sm:text-base">Защитите энергетическое ядро, побеждайте командиров и открывайте достижения вместе со своим классом.</p>
         <div className="mt-7 flex flex-wrap gap-2 text-xs text-white/70"><Feature icon={<Crosshair size={13} />} text="Захват слов" /><Feature icon={<Zap size={13} />} text="Комбо и бонусы" /><Feature icon={<Users size={13} />} text="Командный рейтинг" /></div>

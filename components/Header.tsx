@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { SignOutButton } from "@/components/SignOutButton";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { useI18n } from "@/components/LocaleProvider";
+import type { ProfileFrameTheme } from "@/lib/defense-shop";
 
 export function Header({ user, hidden = false }: { user?: User; hidden?: boolean }) {
   const pathname = usePathname();
@@ -91,7 +92,7 @@ export function Header({ user, hidden = false }: { user?: User; hidden?: boolean
 
 interface HeaderDecoration {
   avatarUrl: string | null;
-  frame: "none" | "solar" | "plasma" | "legend";
+  frame: ProfileFrameTheme;
   profileTitle: string | null;
 }
 
@@ -100,5 +101,8 @@ function headerAvatarClass(frame: HeaderDecoration["frame"] | undefined) {
   if (frame === "solar") return `${base} border border-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.42)]`;
   if (frame === "plasma") return `${base} border border-fuchsia-400 shadow-[0_0_14px_rgba(217,70,239,0.46),0_0_8px_rgba(34,211,238,0.4)]`;
   if (frame === "legend") return `${base} border border-white shadow-[0_0_10px_rgba(255,255,255,0.5),0_0_18px_rgba(251,191,36,0.42)]`;
+  if (frame === "aurora") return `${base} border border-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.46),0_0_9px_rgba(34,211,238,0.42)]`;
+  if (frame === "inferno") return `${base} border border-orange-300 shadow-[0_0_14px_rgba(249,115,22,0.55),0_0_8px_rgba(239,68,68,0.4)]`;
+  if (frame === "abyss") return `${base} border border-cyan-100 shadow-[0_0_12px_rgba(255,255,255,0.44),0_0_18px_rgba(14,165,233,0.48),0_0_8px_rgba(139,92,246,0.4)]`;
   return `${base} border border-white/[0.07] shadow-inner`;
 }

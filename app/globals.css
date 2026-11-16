@@ -549,6 +549,27 @@ button.data-card:hover {
   --core-glow: rgb(34 211 238 / 0.72);
 }
 
+.defense-core-aurora {
+  --core-main: #6ee7b7;
+  --core-ring: #67e8f9;
+  --core-shell: rgb(16 185 129 / 0.18);
+  --core-glow: rgb(52 211 153 / 0.68);
+}
+
+.defense-core-magma {
+  --core-main: #fde68a;
+  --core-ring: #f97316;
+  --core-shell: rgb(153 27 27 / 0.22);
+  --core-glow: rgb(249 115 22 / 0.78);
+}
+
+.defense-core-abyss {
+  --core-main: #ffffff;
+  --core-ring: #22d3ee;
+  --core-shell: rgb(49 46 129 / 0.24);
+  --core-glow: rgb(14 165 233 / 0.76);
+}
+
 .defense-burst {
   width: 0.45rem;
   height: 0.45rem;
@@ -594,6 +615,23 @@ button.data-card:hover {
   border: 2px solid #c084fc;
   background: #020205;
   box-shadow: 0 0 0 9px rgb(126 34 206 / 0.28), 0 0 0 22px rgb(49 46 129 / 0.16), inset 0 0 8px #000, 0 0 42px 16px rgb(168 85 247 / 0.62);
+}
+
+.defense-burst-style-aurora {
+  background: #ecfeff;
+  box-shadow: 0 0 0 8px rgb(52 211 153 / 0.26), 0 0 0 18px rgb(34 211 238 / 0.16), 0 0 38px 16px rgb(16 185 129 / 0.68);
+}
+
+.defense-burst-style-meteor {
+  border-radius: 35% 65% 48% 52%;
+  background: #fff7c2;
+  box-shadow: -13px 6px 0 -2px rgb(239 68 68 / 0.64), 10px -8px 0 -2px rgb(249 115 22 / 0.68), 0 0 0 13px rgb(251 191 36 / 0.16), 0 0 44px 16px rgb(249 115 22 / 0.76);
+}
+
+.defense-burst-style-tide {
+  border: 2px solid #a5f3fc;
+  background: #ffffff;
+  box-shadow: 0 0 0 9px rgb(14 165 233 / 0.24), 0 0 0 20px rgb(34 211 238 / 0.14), 0 0 0 31px rgb(139 92 246 / 0.08), 0 0 45px 17px rgb(14 165 233 / 0.68);
 }
 
 .defense-reward-glow {

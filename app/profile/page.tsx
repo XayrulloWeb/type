@@ -105,5 +105,8 @@ function profileFrameClass(frame: ProfileFrameTheme) {
   if (frame === "solar") return `${base} border-2 border-amber-300 shadow-[0_0_28px_rgba(251,191,36,0.4),inset_0_0_16px_rgba(251,191,36,0.2)]`;
   if (frame === "plasma") return `${base} border-2 border-fuchsia-400 shadow-[0_0_30px_rgba(217,70,239,0.42),0_0_12px_rgba(34,211,238,0.52)]`;
   if (frame === "legend") return `${base} border-2 border-white shadow-[0_0_18px_rgba(255,255,255,0.45),0_0_34px_rgba(251,191,36,0.5),0_0_52px_rgba(96,165,250,0.24)]`;
+  if (frame === "aurora") return `${base} border-2 border-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.46),0_0_38px_rgba(34,211,238,0.28)]`;
+  if (frame === "inferno") return `${base} border-2 border-orange-300 shadow-[0_0_26px_rgba(249,115,22,0.58),0_0_44px_rgba(239,68,68,0.28)]`;
+  if (frame === "abyss") return `${base} border-2 border-cyan-100 shadow-[0_0_18px_rgba(255,255,255,0.42),0_0_34px_rgba(14,165,233,0.52),0_0_54px_rgba(139,92,246,0.22)]`;
   return `${base} border border-nova-accent/25 shadow-inner`;
 }
