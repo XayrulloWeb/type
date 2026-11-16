@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, LockKeyhole, Medal, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, ShoppingBag, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
 import clsx from "clsx";
-import { getDefenseShopItemForArena, type DefenseArenaTheme } from "@/lib/defense-shop";
+import { getDefenseShopItemForArena, type DefenseArenaTheme, type DefenseLaserTheme, type DefenseLoadout } from "@/lib/defense-shop";
 import {
   DEFENSE_CONFIG,
   DEFENSE_MAX_WAVES,
@@ -122,9 +122,16 @@ const arenaThemes: Record<ArenaTheme, { title: string; subtitle: string; image: 
   },
 };
 
+const laserThemes: Record<DefenseLaserTheme, { beam: string; glow: string }> = {
+  cyan: { beam: "#8df4ff", glow: "rgba(83,221,235,0.3)" },
+  solar: { beam: "#fbbf24", glow: "rgba(251,191,36,0.34)" },
+  plasma: { beam: "#e879f9", glow: "rgba(217,70,239,0.34)" },
+  toxic: { beam: "#4ade80", glow: "rgba(74,222,128,0.34)" },
+};
+
 const PREFERENCES_KEY = "nova-defense-preferences-v1";
 
-export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, ownedArenas }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean; ownedArenas: DefenseArenaTheme[] }) {
+export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, ownedArenas, initialLoadout }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean; ownedArenas: DefenseArenaTheme[]; initialLoadout: DefenseLoadout }) {
   const [language, setLanguage] = useState(initialLanguage);
   const [difficulty, setDifficulty] = useState(initialDifficulty);
   const [phaseState, setPhaseState] = useState<Phase>("setup");
@@ -139,7 +146,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [effectsVolume, setEffectsVolume] = useState(0.72);
   const [musicVolume, setMusicVolume] = useState(0.42);
-  const [arena, setArena] = useState<ArenaTheme>("nova");
+  const [arena, setArena] = useState<ArenaTheme>(initialLoadout.arena);
   const [capsLock, setCapsLock] = useState(false);
   const [errorFlash, setErrorFlash] = useState(false);
   const [bursts, setBursts] = useState<Burst[]>([]);
@@ -297,8 +304,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) ?? "null") as Partial<{ arena: ArenaTheme; musicEnabled: boolean; soundEnabled: boolean; musicVolume: number; effectsVolume: number }> | null;
-        if (saved?.arena && saved.arena in arenaThemes && ownedArenas.includes(saved.arena)) setArena(saved.arena);
+        const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) ?? "null") as Partial<{ musicEnabled: boolean; soundEnabled: boolean; musicVolume: number; effectsVolume: number }> | null;
         if (typeof saved?.musicEnabled === "boolean") setMusicEnabled(saved.musicEnabled);
         if (typeof saved?.soundEnabled === "boolean") setSoundEnabled(saved.soundEnabled);
         if (typeof saved?.musicVolume === "number") setMusicVolume(clampVolume(saved.musicVolume));
@@ -309,12 +315,12 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
       preferencesReadyRef.current = true;
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [ownedArenas]);
+  }, []);
 
   useEffect(() => {
     if (!preferencesReadyRef.current) return;
-    window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ arena, musicEnabled, soundEnabled, musicVolume, effectsVolume }));
-  }, [arena, effectsVolume, musicEnabled, musicVolume, soundEnabled]);
+    window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ musicEnabled, soundEnabled, musicVolume, effectsVolume }));
+  }, [effectsVolume, musicEnabled, musicVolume, soundEnabled]);
 
   useEffect(() => {
     const activePhase = phaseState === "countdown" || phaseState === "playing" || phaseState === "paused";
@@ -696,6 +702,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   }, [setPhase]);
 
   const activeTarget = activeTargetId === null ? undefined : targets.find((target) => target.id === activeTargetId);
+  const laserTheme = laserThemes[initialLoadout.laser];
   const accuracy = liveAccuracy(stats);
   const wpm = liveWpm(stats);
   const speedMultiplier = 1 + Math.min(0.5, stats.elapsedMs / 160_000) + (wave - 1) * 0.06;
@@ -736,7 +743,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
         <div className="absolute right-4 top-[4.8rem] z-20 w-48 rounded-xl border border-cyan-300/15 bg-cyan-950/25 px-3 py-2.5 backdrop-blur-md sm:right-6"><div className="flex items-end justify-between gap-3"><div><div className="text-[9px] uppercase tracking-[0.16em] text-cyan-100/40">Волна {wave}</div><div className="mt-0.5 text-xs font-semibold text-cyan-100">{waveCopy[wave - 1].title}</div></div><div className="text-right"><div className="text-sm font-semibold text-cyan-200">x{speedMultiplier.toFixed(2)}</div><div className="text-[8px] uppercase tracking-wider text-cyan-100/35">темп</div></div></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-nova-accent transition-[width] duration-300" style={{ width: `${waveProgress}%` }} /></div></div>
 
         <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-          {activeTarget && <><line x1="50" y1="93" x2={activeTarget.x + 3} y2={activeTarget.y + 2} stroke="rgba(83,221,235,0.28)" strokeWidth="0.7" /><line x1="50" y1="93" x2={activeTarget.x + 3} y2={activeTarget.y + 2} stroke="#8df4ff" strokeWidth="0.16" /></>}
+          {activeTarget && <><line x1="50" y1="93" x2={activeTarget.x + 3} y2={activeTarget.y + 2} stroke={laserTheme.glow} strokeWidth="0.7" /><line x1="50" y1="93" x2={activeTarget.x + 3} y2={activeTarget.y + 2} stroke={laserTheme.beam} strokeWidth="0.16" /></>}
         </svg>
 
         <div className="absolute inset-0 z-10">
@@ -751,12 +758,12 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
               {target.kind === "boss" && <span className="mt-2 block font-sans text-[7px] uppercase tracking-[0.18em] text-white/38">Щит {Math.min(3, completedBossPhases + 1)} / 3</span>}
             </div>;
           })}
-          {bursts.map((burst) => <div key={burst.id} className={clsx("defense-burst absolute", `defense-burst-${burst.kind}`)} style={{ left: `${burst.x}%`, top: `${burst.y}%` }} />)}
+          {bursts.map((burst) => <div key={burst.id} className={clsx("defense-burst absolute", `defense-burst-${burst.kind}`, `defense-burst-style-${initialLoadout.burst}`)} style={{ left: `${burst.x}%`, top: `${burst.y}%` }} />)}
         </div>
 
         <div className="absolute inset-x-0 top-[82%] z-10"><div className="defense-perimeter h-px bg-red-400/75 shadow-[0_0_18px_rgba(248,113,113,0.8)]" /><div className="absolute right-4 top-2 text-[8px] font-bold uppercase tracking-[0.22em] text-red-300/75 sm:right-8">Critical perimeter · breach</div></div>
         {powerupRemaining.shield > 0 && <div className="defense-shield-field pointer-events-none absolute bottom-[-1.8rem] left-1/2 z-10 h-36 w-72 -translate-x-1/2 rounded-[50%] border border-cyan-200/45 bg-cyan-200/[0.035]" />}
-        <div className="defense-core absolute bottom-[1.2%] left-1/2 z-10 h-16 w-16 -translate-x-1/2 rounded-full border border-nova-accent/55 bg-nova-accent/15 shadow-[0_0_35px_rgba(227,182,75,0.42)]"><div className="absolute inset-3 rounded-full border border-cyan-300/45 bg-[#071113] shadow-[inset_0_0_16px_rgba(83,221,235,0.35)]" /><div className="absolute inset-[1.35rem] rounded-full bg-nova-accent shadow-[0_0_20px_rgba(227,182,75,0.9)]" /></div>
+        <div className={clsx("defense-core absolute bottom-[1.2%] left-1/2 z-10 h-16 w-16 -translate-x-1/2 rounded-full border", `defense-core-${initialLoadout.core}`)}><div className="defense-core-ring absolute inset-3 rounded-full border" /><div className="defense-core-gem absolute inset-[1.35rem] rounded-full" /></div>
 
         <aside className="absolute bottom-24 right-5 z-20 hidden w-64 rounded-2xl border border-white/[0.08] bg-[#071012]/72 p-4 shadow-2xl backdrop-blur-xl xl:block"><div className="flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">Combat log</span><Crosshair size={14} className="text-cyan-300" /></div><div className="mt-3 grid grid-cols-2 gap-2"><MiniMetric label="Уничтожено" value={stats.destroyed} /><MiniMetric label="Командиры" value={stats.bossesDestroyed} /></div><div className="mt-3 grid grid-cols-4 gap-1 border-t border-white/[0.06] pt-3"><TargetLegend kind="swift" /><TargetLegend kind="armored" /><TargetLegend kind="special" /><TargetLegend kind="boss" /></div><div className="mt-3 space-y-2 border-t border-white/[0.06] pt-3">{combatLog.map((item, index) => <div key={`${item}-${index}`} className={index === 0 ? "font-mono text-[9px] text-cyan-200" : "font-mono text-[9px] text-white/32"}>{item}</div>)}{combatLog.length === 0 && <div className="font-mono text-[9px] text-white/25">Ожидание первой цели...</div>}</div></aside>
 

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { getDefenseShopItem } from "@/lib/defense-shop";
+import { DEFAULT_DEFENSE_LOADOUT, getDefenseShopItem, loadoutUpdateForItem } from "@/lib/defense-shop";
 
 type PurchaseOutcome = "bought" | "owned" | "credits" | "unavailable";
 
@@ -16,7 +16,7 @@ export async function purchaseDefenseItem(formData: FormData) {
 
   const itemId = formData.get("itemId");
   const item = typeof itemId === "string" ? getDefenseShopItem(itemId) : undefined;
-  if (!item) redirect("/games/shop?error=unavailable");
+  if (!item || item.isDefault || item.price <= 0) redirect("/games/shop?error=unavailable");
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -44,6 +44,12 @@ export async function purchaseDefenseItem(formData: FormData) {
         if (balance < item.price) return "credits";
 
         await tx.gamePurchase.create({ data: { userId: user.id, itemId: item.id, price: item.price } });
+        const loadoutUpdate = loadoutUpdateForItem(item);
+        await tx.gameLoadout.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id, ...DEFAULT_DEFENSE_LOADOUT, ...loadoutUpdate },
+          update: loadoutUpdate,
+        });
         return "bought";
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       break;
@@ -66,4 +72,30 @@ export async function purchaseDefenseItem(formData: FormData) {
   if (outcome === "owned") redirect("/games/shop?status=owned");
   if (outcome === "credits") redirect("/games/shop?error=credits");
   redirect("/games/shop?error=unavailable");
+}
+
+export async function equipDefenseItem(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/login");
+  const itemId = formData.get("itemId");
+  const item = typeof itemId === "string" ? getDefenseShopItem(itemId) : undefined;
+  if (!item) redirect("/games/shop?error=unavailable");
+
+  const [user, purchase] = await Promise.all([
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { id: true, role: true, isActive: true, archivedAt: true } }),
+    item.isDefault ? Promise.resolve({ id: "default" }) : prisma.gamePurchase.findUnique({ where: { userId_itemId: { userId: session.user.id, itemId: item.id } }, select: { id: true } }),
+  ]);
+  if (!user?.isActive || user.archivedAt || !["STUDENT", "SUPER_ADMIN"].includes(user.role)) redirect("/login");
+  if (!purchase) redirect("/games/shop?error=not-owned");
+
+  const loadoutUpdate = loadoutUpdateForItem(item);
+  await prisma.gameLoadout.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, ...DEFAULT_DEFENSE_LOADOUT, ...loadoutUpdate },
+    update: loadoutUpdate,
+  });
+
+  revalidatePath("/games/shop");
+  revalidatePath("/games/defense");
+  redirect(`/games/shop?status=equipped&item=${item.id}`);
 }

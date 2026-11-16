@@ -27,6 +27,7 @@ model User {
   testResults       TestResult[]
   gameResults       GameResult[]
   gamePurchases     GamePurchase[]
+  gameLoadout       GameLoadout?
   assignmentResults AssignmentResult[]
   olympiadEntries   OlympiadParticipant[]
   assignedClasses   Class[]               @relation("TeacherClasses")
@@ -76,6 +77,16 @@ model GamePurchase {
 
   @@unique([userId, itemId])
   @@index([userId, createdAt])
+}
+
+model GameLoadout {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  arena     String   @default("nova")
+  laser     String   @default("cyan")
+  core      String   @default("nova")
+  burst     String   @default("spark")
+  updatedAt DateTime @updatedAt
 }
 
 model Class {

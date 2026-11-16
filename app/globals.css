@@ -507,7 +507,46 @@ button.data-card:hover {
 }
 
 .defense-core {
+  --core-main: #e3b64b;
+  --core-ring: #67e8f9;
+  --core-shell: rgb(227 182 75 / 0.15);
+  --core-glow: rgb(227 182 75 / 0.58);
+  border-color: color-mix(in srgb, var(--core-main) 62%, transparent);
+  background: var(--core-shell);
+  box-shadow: 0 0 35px var(--core-glow);
   animation: defense-core 2.4s ease-in-out infinite;
+}
+
+.defense-core-ring {
+  border-color: color-mix(in srgb, var(--core-ring) 58%, transparent);
+  background: #071113;
+  box-shadow: inset 0 0 16px color-mix(in srgb, var(--core-ring) 45%, transparent);
+}
+
+.defense-core-gem {
+  background: var(--core-main);
+  box-shadow: 0 0 20px var(--core-glow);
+}
+
+.defense-core-obsidian {
+  --core-main: #fb7185;
+  --core-ring: #ef4444;
+  --core-shell: rgb(127 29 29 / 0.18);
+  --core-glow: rgb(239 68 68 / 0.62);
+}
+
+.defense-core-royal {
+  --core-main: #fde68a;
+  --core-ring: #e879f9;
+  --core-shell: rgb(126 34 206 / 0.2);
+  --core-glow: rgb(217 70 239 / 0.6);
+}
+
+.defense-core-quantum {
+  --core-main: #ffffff;
+  --core-ring: #67e8f9;
+  --core-shell: rgb(37 99 235 / 0.2);
+  --core-glow: rgb(34 211 238 / 0.72);
 }
 
 .defense-burst {
@@ -538,6 +577,23 @@ button.data-card:hover {
     0 0 0 62px rgb(248 113 113 / 0.055),
     0 0 65px 24px rgb(248 113 113 / 0.72);
   animation: defense-boss-burst 620ms ease-out both;
+}
+
+.defense-burst-style-nova {
+  background: #fff4cf;
+  box-shadow: 0 0 0 9px rgb(251 191 36 / 0.25), 0 0 0 22px rgb(227 182 75 / 0.12), 0 0 38px 14px rgb(251 191 36 / 0.7);
+}
+
+.defense-burst-style-thunder {
+  border-radius: 28% 72% 35% 65%;
+  background: #dbeafe;
+  box-shadow: -12px 5px 0 -2px rgb(96 165 250 / 0.6), 11px -7px 0 -2px rgb(34 211 238 / 0.55), 0 0 0 13px rgb(59 130 246 / 0.13), 0 0 42px 14px rgb(59 130 246 / 0.72);
+}
+
+.defense-burst-style-void {
+  border: 2px solid #c084fc;
+  background: #020205;
+  box-shadow: 0 0 0 9px rgb(126 34 206 / 0.28), 0 0 0 22px rgb(49 46 129 / 0.16), inset 0 0 8px #000, 0 0 42px 16px rgb(168 85 247 / 0.62);
 }
 
 .defense-reward-glow {
