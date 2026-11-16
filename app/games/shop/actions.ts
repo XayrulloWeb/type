@@ -68,6 +68,7 @@ export async function purchaseDefenseItem(formData: FormData) {
   revalidatePath("/games");
   revalidatePath("/games/shop");
   revalidatePath("/games/defense");
+  revalidatePath("/profile");
   if (outcome === "bought") redirect(`/games/shop?status=bought&item=${item.id}`);
   if (outcome === "owned") redirect("/games/shop?status=owned");
   if (outcome === "credits") redirect("/games/shop?error=credits");
@@ -97,5 +98,6 @@ export async function equipDefenseItem(formData: FormData) {
 
   revalidatePath("/games/shop");
   revalidatePath("/games/defense");
+  revalidatePath("/profile");
   redirect(`/games/shop?status=equipped&item=${item.id}`);
 }

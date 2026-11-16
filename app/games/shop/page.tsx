@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Check, Coins, Crosshair, Gamepad2, Gem, LockKeyhole, Orbit, ShoppingBag, Sparkles, Star, Zap } from "lucide-react";
+import { ArrowLeft, Badge, Check, CircleUserRound, Coins, Crosshair, Frame, Gamepad2, Gem, ImageIcon, LockKeyhole, Music2, Orbit, ShoppingBag, Sparkles, Star, Zap } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { prisma } from "@/lib/db";
@@ -9,7 +9,7 @@ import { DEFENSE_CATEGORY_COPY, DEFENSE_SHOP_ITEMS, getDefenseShopItem, normaliz
 import { getDefensePlayerProgress } from "@/lib/defense-progress";
 import { equipDefenseItem, purchaseDefenseItem } from "./actions";
 
-const categories: DefenseShopCategory[] = ["arena", "laser", "core", "burst"];
+const categories: DefenseShopCategory[] = ["arena", "laser", "core", "burst", "music", "avatar", "frame", "banner", "profileTitle"];
 
 export default async function DefenseShopPage({ searchParams }: { searchParams: Promise<{ status?: string; error?: string; item?: string }> }) {
   const session = await getServerSession(authOptions);
@@ -32,7 +32,7 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
   const message = query.status === "bought"
     ? `${changedItem?.title ?? "Предмет"} куплен и сразу экипирован.`
     : query.status === "equipped"
-      ? `${changedItem?.title ?? "Предмет"} теперь используется в игре.`
+      ? `${changedItem?.title ?? "Предмет"} теперь используется в аккаунте.`
       : query.status === "owned"
         ? "Этот предмет уже находится в вашей коллекции."
         : query.error === "credits"
@@ -51,9 +51,9 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
       <div className="relative grid gap-8 px-7 py-12 sm:px-11 lg:grid-cols-[1fr_22rem] lg:items-end lg:py-16">
         <div>
           <Link href="/games" className="inline-flex items-center gap-2 text-xs text-white/45 transition hover:text-white"><ArrowLeft size={14} /> Игровой центр</Link>
-          <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-nova-accent/20 bg-nova-accent/[0.08] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-nova-accent"><ShoppingBag size={12} /> NOVA Armory · 15 предметов</div>
-          <h1 className="mt-5 text-4xl font-semibold tracking-[-0.055em] sm:text-6xl">Соберите свой<br /><span className="text-nova-accent">боевой стиль</span></h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-white/52">Арены, лазеры, энергетические ядра и эффекты уничтожения. Каждая покупка навсегда остаётся в аккаунте, а экипировку можно менять в один клик.</p>
+          <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-nova-accent/20 bg-nova-accent/[0.08] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-nova-accent"><ShoppingBag size={12} /> NOVA Store · {DEFENSE_SHOP_ITEMS.length} предметов</div>
+          <h1 className="mt-5 text-4xl font-semibold tracking-[-0.055em] sm:text-6xl">Создайте свой<br /><span className="text-nova-accent">стиль NOVA</span></h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-white/52">Музыка, аватары, баннеры, титулы и игровая экипировка. Каждая покупка навсегда остаётся в аккаунте и меняется в один клик.</p>
         </div>
         <div className="rounded-2xl border border-nova-accent/20 bg-black/40 p-6 backdrop-blur-xl">
           <div className="flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/35">Ваш баланс</span><Coins size={19} className="text-nova-accent" /></div>
@@ -67,7 +67,7 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
 
     {message && <div className={query.error ? "mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.06] px-5 py-4 text-sm text-red-100" : "mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-4 text-sm text-emerald-100"}>{message}</div>}
 
-    <section className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.018] p-3 sm:grid-cols-4">
+    <section className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.018] p-3 sm:grid-cols-3 lg:grid-cols-5">
       {categories.map((category) => {
         const equipped = DEFENSE_SHOP_ITEMS.find((item) => item.category === category && item.value === loadout[category]);
         return <div key={category} className="rounded-xl border border-white/[0.055] bg-black/15 p-3"><div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.15em] text-white/28"><CategoryIcon category={category} /> {DEFENSE_CATEGORY_COPY[category].eyebrow}</div><div className="mt-2 truncate text-xs font-semibold text-white/78">{equipped?.title}</div></div>;
@@ -94,11 +94,11 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
 
     <section className="mt-10 grid gap-4 lg:grid-cols-3">
       <InfoCard icon={<Zap size={19} />} title={isAdmin ? "Награда ×2" : "Зарабатывайте"} text={isAdmin ? "Личные миссии администратора дают вдвое больше кредитов и не входят в рейтинг учеников." : "Чем выше очки, больше командиров и звёзд — тем больше кредитов за миссию."} />
-      <InfoCard icon={<LockKeyhole size={19} />} title="Покупка навсегда" text="Коллекция и выбранная экипировка сохраняются в аккаунте на всех устройствах." />
+      <InfoCard icon={<LockKeyhole size={19} />} title="Покупка навсегда" text="Музыка, оформление профиля и игровая экипировка сохраняются в аккаунте на всех устройствах." />
       <InfoCard icon={<Star size={19} />} title="Честный рейтинг" text="Все предметы косметические: они меняют стиль, но не скорость целей и не количество очков." />
     </section>
 
-    <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/games/defense" className="nova-button !min-h-12 !rounded-xl"><Gamepad2 size={17} /> Испытать экипировку</Link><Link href="/games" className="nova-button-secondary !min-h-12 !rounded-xl">Игровой рейтинг</Link></div>
+    <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><Link href="/games/defense" className="nova-button !min-h-12 !rounded-xl"><Gamepad2 size={17} /> Испытать игру</Link><Link href="/profile" className="nova-button-secondary !min-h-12 !rounded-xl">Открыть мой профиль</Link></div>
   </main></div>;
 }
 
@@ -112,6 +112,7 @@ function StoreCard({ item, owned, equipped, affordable, balance }: { item: Defen
       {!item.image && <div className="absolute inset-0 grid place-items-center"><PreviewGlyph category={item.category} /></div>}
     </div>
     <div className="p-5"><div className="flex min-h-12 items-start justify-between gap-3"><div><h3 className="font-semibold">{item.title}</h3><p className="mt-1 text-[9px] uppercase tracking-[0.13em] text-nova-accent">{item.subtitle}</p></div>{item.price > 0 && <div className="flex items-center gap-1 rounded-lg border border-nova-accent/15 bg-nova-accent/[0.055] px-2.5 py-1.5 text-xs font-semibold text-nova-accent"><Coins size={12} /> {item.price}</div>}</div><p className="mt-3 min-h-16 text-[11px] leading-5 text-nova-muted">{item.description}</p>
+      {item.audio && <div className="mt-3 rounded-xl border border-white/[0.07] bg-black/25 p-2.5"><audio className="h-8 w-full" controls preload="none"><source src={item.audio.src} type="audio/mpeg" /></audio><p className="mt-2 text-[8px] leading-4 text-white/35"><a className="transition hover:text-nova-accent" href={item.audio.sourceUrl} target="_blank" rel="noreferrer">{item.audio.credit}</a> · <a className="transition hover:text-nova-accent" href={item.audio.licenseUrl} target="_blank" rel="noreferrer">CC BY 4.0</a></p></div>}
       {equipped ? <div className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-nova-accent/18 bg-nova-accent/[0.055] text-xs font-semibold text-nova-accent"><Check size={14} /> Используется</div> : owned ? <form action={equipDefenseItem} className="mt-4"><input type="hidden" name="itemId" value={item.id} /><button className="nova-button-secondary !min-h-10 !w-full !rounded-xl" type="submit"><Crosshair size={14} /> Экипировать</button></form> : <form action={purchaseDefenseItem} className="mt-4"><input type="hidden" name="itemId" value={item.id} /><button className="nova-button !min-h-10 !w-full !rounded-xl" type="submit"><Sparkles size={14} /> Купить за {item.price}</button>{!affordable && <p className="mt-2 text-center text-[8px] text-white/28">Не хватает {(item.price - balance).toLocaleString("ru-RU")} кредитов</p>}</form>}
     </div>
   </article>;
@@ -121,12 +122,22 @@ function CategoryIcon({ category }: { category: DefenseShopCategory }) {
   if (category === "laser") return <Zap size={11} />;
   if (category === "core") return <Orbit size={11} />;
   if (category === "burst") return <Sparkles size={11} />;
+  if (category === "music") return <Music2 size={11} />;
+  if (category === "avatar") return <CircleUserRound size={11} />;
+  if (category === "frame") return <Frame size={11} />;
+  if (category === "banner") return <ImageIcon size={11} />;
+  if (category === "profileTitle") return <Badge size={11} />;
   return <Gem size={11} />;
 }
 
 function PreviewGlyph({ category }: { category: DefenseShopCategory }) {
   if (category === "laser") return <div className="h-px w-28 rotate-[-18deg] bg-white shadow-[0_0_14px_4px_currentColor]" />;
   if (category === "core") return <div className="h-16 w-16 rounded-full border border-white/35 shadow-[0_0_30px_8px_rgba(255,255,255,0.2),inset_0_0_22px_rgba(255,255,255,0.2)]" />;
+  if (category === "music") return <Music2 size={42} className="text-white/70 drop-shadow-[0_0_18px_rgba(34,211,238,0.55)]" />;
+  if (category === "avatar") return <CircleUserRound size={48} className="text-white/65" />;
+  if (category === "frame") return <Frame size={52} className="text-white/70 drop-shadow-[0_0_18px_rgba(251,191,36,0.45)]" />;
+  if (category === "banner") return <ImageIcon size={50} className="text-white/65" />;
+  if (category === "profileTitle") return <Badge size={50} className="text-white/70 drop-shadow-[0_0_18px_rgba(251,191,36,0.45)]" />;
   return <Sparkles size={42} className="text-white/65 drop-shadow-[0_0_18px_rgba(255,255,255,0.65)]" />;
 }
 

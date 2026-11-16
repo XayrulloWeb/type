@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, LockKeyhole, Medal, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, ShoppingBag, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
 import clsx from "clsx";
-import { getDefenseShopItemForArena, type DefenseArenaTheme, type DefenseLaserTheme, type DefenseLoadout } from "@/lib/defense-shop";
+import { getDefenseShopItemForArena, getDefenseShopItemForCategory, type DefenseArenaTheme, type DefenseLaserTheme, type DefenseLoadout } from "@/lib/defense-shop";
 import {
   DEFENSE_CONFIG,
   DEFENSE_MAX_WAVES,
@@ -181,6 +181,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   const saveDurationRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
   const musicRef = useRef<MusicEngine | null>(null);
+  const musicTrackRef = useRef<HTMLAudioElement | null>(null);
   const preferencesReadyRef = useRef(false);
 
   const setPhase = useCallback((phase: Phase) => {
@@ -246,6 +247,12 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   }, []);
 
   const stopAmbientMusic = useCallback(() => {
+    const track = musicTrackRef.current;
+    if (track) {
+      track.pause();
+      track.currentTime = 0;
+      musicTrackRef.current = null;
+    }
     const engine = musicRef.current;
     if (!engine) return;
     const context = audioRef.current;
@@ -264,10 +271,24 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
 
   const startAmbientMusic = useCallback(async () => {
     if (!musicEnabled) return;
+    stopAmbientMusic();
+    const selectedMusic = getDefenseShopItemForCategory("music", initialLoadout.music);
+    if (selectedMusic?.audio) {
+      const track = new Audio(selectedMusic.audio.src);
+      track.loop = true;
+      track.preload = "auto";
+      track.volume = Math.min(1, musicVolume * 0.72);
+      musicTrackRef.current = track;
+      try {
+        await track.play();
+      } catch {
+        musicTrackRef.current = null;
+      }
+      return;
+    }
     const context = audioRef.current ?? new AudioContext();
     audioRef.current = context;
     if (context.state === "suspended") await context.resume();
-    stopAmbientMusic();
 
     const master = context.createGain();
     const filter = context.createBiquadFilter();
@@ -299,7 +320,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     master.gain.exponentialRampToValueAtTime(Math.max(0.0001, musicVolume * 0.038), context.currentTime + 0.9);
     filter.connect(compressor).connect(master).connect(context.destination);
     musicRef.current = { gain: master, oscillators, lfo };
-  }, [arena, musicEnabled, musicVolume, stopAmbientMusic]);
+  }, [arena, initialLoadout.music, musicEnabled, musicVolume, stopAmbientMusic]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

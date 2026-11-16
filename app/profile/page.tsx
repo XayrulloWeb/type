@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { format } from "date-fns";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -10,6 +11,7 @@ import { ProgressChart } from "@/components/charts/ProgressChart";
 import { getI18n } from "@/lib/i18n";
 import { SpeedStandardCard } from "@/components/SpeedStandardCard";
 import { normalizeDifficulty, type DifficultyFilter } from "@/lib/leaderboard";
+import { getDefenseShopItemForCategory, normalizeDefenseLoadout, type ProfileFrameTheme } from "@/lib/defense-shop";
 
 function calculateStreak(dates: Date[]) {
   const days = [...new Set(dates.map((date) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())))] .sort((a, b) => b - a);
@@ -30,7 +32,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
   const [user, tests, { t }, query] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.user.id }, include: { class: true } }),
+    prisma.user.findUnique({ where: { id: session.user.id }, include: { class: true, gameLoadout: true } }),
     prisma.testResult.findMany({ where: { userId: session.user.id, language: { in: ["ru", "en"] } }, orderBy: { createdAt: "asc" } }),
     getI18n(),
     searchParams,
@@ -38,6 +40,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   if (!user) redirect("/login");
   const difficulty = normalizeDifficulty(query.difficulty);
   const adminMode = user.role === "SUPER_ADMIN";
+  const loadout = normalizeDefenseLoadout(user.gameLoadout);
+  const avatar = getDefenseShopItemForCategory("avatar", loadout.avatar);
+  const banner = getDefenseShopItemForCategory("banner", loadout.banner);
+  const profileTitle = getDefenseShopItemForCategory("profileTitle", loadout.profileTitle);
+  const bannerStyle = banner?.image ? { backgroundImage: `url(${banner.image})` } : { background: banner?.preview };
   const selectedTests = tests.filter((test) => test.difficulty === difficulty);
   const ranked = selectedTests.filter((test) => test.isRanked);
   const bestWpm = ranked.length ? Math.max(...ranked.map((test) => test.wpm)) : 0;
@@ -59,7 +66,28 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   });
 
   return <div className="min-h-screen"><Header user={session.user} /><main className="page-shell">
-    <section className="data-card overflow-hidden p-6 sm:p-8"><div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-nova-accent/[0.07] blur-3xl" /><div className="relative flex flex-col gap-5 sm:flex-row sm:items-center"><div className="grid h-20 w-20 place-items-center rounded-2xl border border-nova-accent/25 bg-gradient-to-br from-nova-accent/15 to-transparent text-2xl font-semibold text-nova-accent shadow-inner">{user.firstName[0]}{user.lastName[0]}</div><div className="flex-1"><div className="page-eyebrow">Личный профиль</div><h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">{user.firstName} {user.lastName}</h1><p className="mt-2 text-sm text-nova-muted">{adminMode ? t("role.admin") : user.class?.name ?? t("profile.noClass")} · <span className="font-semibold uppercase text-nova-accent">{getLevel(bestWpm)}</span></p></div><Link href="/history" className="nova-button-secondary">{t("profile.fullHistory")}</Link></div></section>
+    <section className="data-card relative overflow-hidden p-6 sm:p-8">
+      <div className="absolute inset-0 bg-cover bg-center opacity-60" style={bannerStyle} />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0b0e0f]/95 via-[#0b0e0f]/74 to-[#0b0e0f]/38" />
+      <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-nova-accent/[0.09] blur-3xl" />
+      <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
+        <div className={profileFrameClass(loadout.frame)}>
+          {avatar?.image
+            ? <Image src={avatar.image} alt={avatar.title} width={96} height={96} className="h-full w-full rounded-[1.05rem] object-cover" priority />
+            : <span>{user.firstName[0]}{user.lastName[0]}</span>}
+        </div>
+        <div className="flex-1">
+          <div className="page-eyebrow">Личный профиль</div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">{user.firstName} {user.lastName}</h1>
+          <div className="mt-2 inline-flex rounded-full border border-nova-accent/20 bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-nova-accent backdrop-blur">{profileTitle?.title ?? "Защитник NOVA"}</div>
+          <p className="mt-3 text-sm text-nova-muted">{adminMode ? t("role.admin") : user.class?.name ?? t("profile.noClass")} · <span className="font-semibold uppercase text-nova-accent">{getLevel(bestWpm)}</span></p>
+        </div>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <Link href="/games/shop#avatar" className="nova-button">Оформить профиль</Link>
+          <Link href="/history" className="nova-button-secondary">{t("profile.fullHistory")}</Link>
+        </div>
+      </div>
+    </section>
     <div className="mt-5 flex w-fit gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1.5">{(["easy", "medium", "hard"] as DifficultyFilter[]).map((item) => <Link key={item} href={`/profile?difficulty=${item}`} className={item === difficulty ? "test-option test-option-active" : "test-option"}>{t(`difficulty.${item}`)}</Link>)}</div>
     <section className="my-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"><Stat value={bestWpm} label={t("profile.bestWpm")} accent /><Stat value={avgWpm} label={t("profile.avgWpm")} /><Stat value={`${avgAccuracy.toFixed(0)}%`} label={t("typing.accuracy")} /><Stat value={selectedTests.length} label={t("profile.tests")} /><Stat value={`${Math.floor(typingSeconds / 60)}m`} label={t("profile.typingTime")} /><Stat value={streak} label={t("profile.streak")} /></section>
     {user.class && <SpeedStandardCard grade={user.class.grade} bestWpm={bestWpm} className="mb-8 !max-w-none" />}
@@ -70,3 +98,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
 }
 
 function Stat({ value, label, accent = false }: { value: string | number; label: string; accent?: boolean }) { return <div className="data-card p-4"><div className={`text-2xl font-semibold tracking-[-0.03em] ${accent ? "text-nova-accent" : "text-nova-text"}`}>{value}</div><div className="mt-1.5 text-[9px] uppercase tracking-wider text-nova-muted">{label}</div></div>; }
+
+function profileFrameClass(frame: ProfileFrameTheme) {
+  const base = "grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-[1.3rem] bg-[#101416] text-2xl font-semibold text-nova-accent";
+  if (frame === "solar") return `${base} border-2 border-amber-300 shadow-[0_0_28px_rgba(251,191,36,0.4),inset_0_0_16px_rgba(251,191,36,0.2)]`;
+  if (frame === "plasma") return `${base} border-2 border-fuchsia-400 shadow-[0_0_30px_rgba(217,70,239,0.42),0_0_12px_rgba(34,211,238,0.52)]`;
+  if (frame === "legend") return `${base} border-2 border-white shadow-[0_0_18px_rgba(255,255,255,0.45),0_0_34px_rgba(251,191,36,0.5),0_0_52px_rgba(96,165,250,0.24)]`;
+  return `${base} border border-nova-accent/25 shadow-inner`;
+}

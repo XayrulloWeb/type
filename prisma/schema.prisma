@@ -80,13 +80,18 @@ model GamePurchase {
 }
 
 model GameLoadout {
-  userId    String   @id
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  arena     String   @default("nova")
-  laser     String   @default("cyan")
-  core      String   @default("nova")
-  burst     String   @default("spark")
-  updatedAt DateTime @updatedAt
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  arena        String   @default("nova")
+  laser        String   @default("cyan")
+  core         String   @default("nova")
+  burst        String   @default("spark")
+  music        String   @default("adaptive")
+  avatar       String   @default("initials")
+  frame        String   @default("none")
+  banner       String   @default("none")
+  profileTitle String   @default("rookie")
+  updatedAt    DateTime @updatedAt
 }
 
 model Class {
