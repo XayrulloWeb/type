@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { User } from "next-auth";
 import { BarChart3, BookOpenText, ChevronDown, ClipboardList, Gamepad2, History, Keyboard, Sparkles, Trophy, UserRound } from "lucide-react";
 import clsx from "clsx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SignOutButton } from "@/components/SignOutButton";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { useI18n } from "@/components/LocaleProvider";
@@ -13,7 +14,19 @@ import { useI18n } from "@/components/LocaleProvider";
 export function Header({ user, hidden = false }: { user?: User; hidden?: boolean }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [decoration, setDecoration] = useState<HeaderDecoration | null>(null);
   const { t } = useI18n();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const controller = new AbortController();
+    fetch("/api/profile/header", { cache: "no-store", signal: controller.signal })
+      .then((response) => response.ok ? response.json() as Promise<HeaderDecoration> : null)
+      .then((value) => { if (value) setDecoration(value); })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [user?.id]);
+
   if (hidden) return null;
 
   const navItems = [
@@ -52,12 +65,14 @@ export function Header({ user, hidden = false }: { user?: User; hidden?: boolean
         <SignOutButton className="hidden shrink-0 sm:inline-flex" />
         <div className="relative">
           <button onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-3 rounded-xl border border-transparent px-2 py-1.5 text-left transition hover:border-white/[0.07] hover:bg-white/[0.035]" aria-expanded={menuOpen}>
-          <span className="grid h-9 w-9 place-items-center rounded-xl border border-white/[0.07] bg-gradient-to-br from-[#232729] to-[#151719] text-xs font-semibold text-nova-accent shadow-inner">
-            {(user?.firstName || user?.username || "N")[0]?.toUpperCase()}
+          <span className={headerAvatarClass(decoration?.frame)}>
+            {decoration?.avatarUrl
+              ? <Image src={decoration.avatarUrl} alt="" width={36} height={36} unoptimized={decoration.avatarUrl.startsWith("/uploads/")} className="h-full w-full rounded-[0.62rem] object-cover" />
+              : (user?.firstName || user?.username || "N")[0]?.toUpperCase()}
           </span>
           <span className="hidden min-w-20 sm:block">
             <span className="flex items-center gap-1 text-xs font-semibold text-nova-text">{user?.firstName || user?.username || "Student"}<ChevronDown className={clsx("transition-transform", menuOpen && "rotate-180")} size={12} /></span>
-            <span className="block text-[10px] text-nova-muted">{user?.role === "SUPER_ADMIN" ? t("role.admin") : user?.className ?? t("role.noClass")}</span>
+            <span className="block max-w-32 truncate text-[10px] text-nova-muted">{user?.role === "SUPER_ADMIN" ? t("role.admin") : user?.className ?? t("role.noClass")}{decoration?.profileTitle ? ` · ${decoration.profileTitle}` : ""}</span>
           </span>
           </button>
           {menuOpen && (
@@ -72,4 +87,18 @@ export function Header({ user, hidden = false }: { user?: User; hidden?: boolean
       </div>
     </header>
   );
+}
+
+interface HeaderDecoration {
+  avatarUrl: string | null;
+  frame: "none" | "solar" | "plasma" | "legend";
+  profileTitle: string | null;
+}
+
+function headerAvatarClass(frame: HeaderDecoration["frame"] | undefined) {
+  const base = "grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-[#232729] to-[#151719] text-xs font-semibold text-nova-accent";
+  if (frame === "solar") return `${base} border border-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.42)]`;
+  if (frame === "plasma") return `${base} border border-fuchsia-400 shadow-[0_0_14px_rgba(217,70,239,0.46),0_0_8px_rgba(34,211,238,0.4)]`;
+  if (frame === "legend") return `${base} border border-white shadow-[0_0_10px_rgba(255,255,255,0.5),0_0_18px_rgba(251,191,36,0.42)]`;
+  return `${base} border border-white/[0.07] shadow-inner`;
 }
