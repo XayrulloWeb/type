@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, Medal, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
+import { Building2, Coins, Crosshair, Crown, Expand, Gamepad2, Gem, Heart, LockKeyhole, Medal, Music2, Pause, Play, RotateCcw, Shield, ShieldCheck, ShoppingBag, Snowflake, Sparkles, Star, Trophy, Volume2, VolumeX, X, Zap } from "lucide-react";
 import clsx from "clsx";
+import { getDefenseShopItemForArena, type DefenseArenaTheme } from "@/lib/defense-shop";
 import {
   DEFENSE_CONFIG,
   DEFENSE_MAX_WAVES,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/defense-shared";
 
 type Phase = "setup" | "loading" | "countdown" | "playing" | "paused" | "saving" | "result";
-type ArenaTheme = "nova" | "cyber" | "ice";
+type ArenaTheme = DefenseArenaTheme;
 
 interface MusicEngine {
   gain: GainNode;
@@ -123,7 +124,7 @@ const arenaThemes: Record<ArenaTheme, { title: string; subtitle: string; image: 
 
 const PREFERENCES_KEY = "nova-defense-preferences-v1";
 
-export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean }) {
+export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, ownedArenas }: { initialLanguage: DefenseLanguage; initialDifficulty: DefenseDifficulty; adminMode: boolean; ownedArenas: DefenseArenaTheme[] }) {
   const [language, setLanguage] = useState(initialLanguage);
   const [difficulty, setDifficulty] = useState(initialDifficulty);
   const [phaseState, setPhaseState] = useState<Phase>("setup");
@@ -297,7 +298,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
     const timer = window.setTimeout(() => {
       try {
         const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) ?? "null") as Partial<{ arena: ArenaTheme; musicEnabled: boolean; soundEnabled: boolean; musicVolume: number; effectsVolume: number }> | null;
-        if (saved?.arena && saved.arena in arenaThemes) setArena(saved.arena);
+        if (saved?.arena && saved.arena in arenaThemes && ownedArenas.includes(saved.arena)) setArena(saved.arena);
         if (typeof saved?.musicEnabled === "boolean") setMusicEnabled(saved.musicEnabled);
         if (typeof saved?.soundEnabled === "boolean") setSoundEnabled(saved.soundEnabled);
         if (typeof saved?.musicVolume === "number") setMusicVolume(clampVolume(saved.musicVolume));
@@ -308,7 +309,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
       preferencesReadyRef.current = true;
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [ownedArenas]);
 
   useEffect(() => {
     if (!preferencesReadyRef.current) return;
@@ -777,6 +778,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
         loading={phaseState === "loading"}
         musicEnabled={musicEnabled}
         musicVolume={musicVolume}
+        ownedArenas={ownedArenas}
         saveError={saveError}
         soundEnabled={soundEnabled}
         onArenaChange={setArena}
@@ -807,7 +809,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode }: {
           </div>
           <div className="mt-5 text-center text-[10px] text-white/35">{adminMode ? "Очки, кредиты и достижения сохранены в личный прогресс администратора. В рейтинг учеников результат не входит." : result.isRanked ? "Результат добавлен в игровой рейтинг." : "Результат сохранён как тренировочный."}</div>
           {saveError && <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] p-3 text-center text-xs text-red-200">Сервер не подтвердил сохранение. <button className="font-semibold underline" onClick={retrySave}>Повторить</button></div>}
-          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button className="nova-button !min-h-12" onClick={() => void startMission()}><RotateCcw size={16} /> Играть снова</button><Link href="/games" className="nova-button-secondary !min-h-12"><Trophy size={16} /> Игровой рейтинг</Link></div>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row"><button className="nova-button !min-h-12" onClick={() => void startMission()}><RotateCcw size={16} /> Играть снова</button><Link href="/games/shop" className="nova-button-secondary !min-h-12"><ShoppingBag size={16} /> Магазин</Link><Link href="/games" className="nova-button-secondary !min-h-12"><Trophy size={16} /> Рейтинг</Link></div>
           <div className="mt-4 text-center text-[9px] uppercase tracking-[0.16em] text-white/25">Enter или Tab — новая миссия</div>
         </div>
       </div>}
@@ -823,6 +825,7 @@ function MissionSetup({
   loading,
   musicEnabled,
   musicVolume,
+  ownedArenas,
   saveError,
   soundEnabled,
   onArenaChange,
@@ -841,6 +844,7 @@ function MissionSetup({
   loading: boolean;
   musicEnabled: boolean;
   musicVolume: number;
+  ownedArenas: DefenseArenaTheme[];
   saveError: boolean;
   soundEnabled: boolean;
   onArenaChange: (arena: ArenaTheme) => void;
@@ -873,7 +877,7 @@ function MissionSetup({
         </section>
 
         <section className="p-6 sm:p-8 lg:p-10">
-          <div className="flex items-end justify-between gap-4"><div><p className="page-eyebrow">Подготовка миссии</p><h2 className="mt-1 text-xl font-semibold">Настройте свою арену</h2></div><div className="nova-badge hidden sm:inline-flex">Настройки сохраняются</div></div>
+            <div className="flex items-end justify-between gap-4"><div><p className="page-eyebrow">Подготовка миссии</p><h2 className="mt-1 text-xl font-semibold">Настройте свою арену</h2></div><Link href="/games/shop" className="nova-badge inline-flex items-center gap-1.5"><ShoppingBag size={11} /> Магазин</Link></div>
 
           <div className="mt-6">
             <SettingLabel title="Арена" hint="Выберите атмосферу боя" />
@@ -881,9 +885,12 @@ function MissionSetup({
               {(Object.keys(arenaThemes) as ArenaTheme[]).map((item) => {
                 const theme = arenaThemes[item];
                 const Icon = theme.icon;
-                return <button key={item} type="button" aria-pressed={arena === item} onClick={() => onArenaChange(item)} className={clsx("group relative min-h-24 overflow-hidden rounded-xl border text-left transition duration-200", arena === item ? "border-cyan-300/55 shadow-[0_0_28px_rgba(83,221,235,0.12)]" : "border-white/[0.08] hover:border-white/20")}>
+                const unlocked = ownedArenas.includes(item);
+                const shopItem = getDefenseShopItemForArena(item);
+                return <button key={item} type="button" aria-pressed={arena === item} aria-label={unlocked ? theme.title : `${theme.title}, закрыто, цена ${shopItem?.price ?? 0} кредитов`} disabled={!unlocked} onClick={() => onArenaChange(item)} className={clsx("group relative min-h-24 overflow-hidden rounded-xl border text-left transition duration-200", arena === item ? "border-cyan-300/55 shadow-[0_0_28px_rgba(83,221,235,0.12)]" : unlocked ? "border-white/[0.08] hover:border-white/20" : "cursor-not-allowed border-white/[0.05] opacity-55")}>
                   <span className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${theme.image})` }} />
-                  <span className="absolute inset-0 bg-gradient-to-t from-[#030708] via-[#030708]/45 to-transparent" />
+                  <span className={unlocked ? "absolute inset-0 bg-gradient-to-t from-[#030708] via-[#030708]/45 to-transparent" : "absolute inset-0 bg-[#030708]/55"} />
+                  {!unlocked && <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/65 px-2 py-1 text-[8px] font-semibold text-white/70 backdrop-blur"><LockKeyhole size={9} /> {shopItem?.price ?? 0}</span>}
                   <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 p-2.5"><span><span className="block text-[11px] font-semibold text-white/90">{theme.title}</span><span className="mt-0.5 block text-[8px] text-white/45">{theme.subtitle}</span></span><Icon size={13} className={arena === item ? "text-cyan-200" : "text-white/45"} /></span>
                 </button>;
               })}

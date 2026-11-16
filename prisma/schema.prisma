@@ -26,6 +26,7 @@ model User {
 
   testResults       TestResult[]
   gameResults       GameResult[]
+  gamePurchases     GamePurchase[]
   assignmentResults AssignmentResult[]
   olympiadEntries   OlympiadParticipant[]
   assignedClasses   Class[]               @relation("TeacherClasses")
@@ -63,6 +64,18 @@ model GameResult {
   @@index([game, difficulty, language, isRanked, score])
   @@index([userId, createdAt])
   @@index([moderationStatus, createdAt])
+}
+
+model GamePurchase {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId    String
+  price     Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+  @@index([userId, createdAt])
 }
 
 model Class {

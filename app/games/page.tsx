@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Award, Check, Coins, Crosshair, Crown, Gamepad2, LockKeyhole, Medal, Shield, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
+import { Award, Check, Coins, Crosshair, Crown, Flame, Gamepad2, Languages, LockKeyhole, Medal, ShoppingBag, Shield, Sparkles, Star, Target, Trophy, Users, Zap } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Header } from "@/components/Header";
@@ -45,7 +45,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
         <h1 className="mt-6 text-4xl font-semibold tracking-[-0.055em] text-white sm:text-6xl">NOVA Defense</h1>
         <p className="mt-4 max-w-xl text-sm leading-7 text-white/65 sm:text-base">Защитите энергетическое ядро, побеждайте командиров и открывайте достижения вместе со своим классом.</p>
         <div className="mt-7 flex flex-wrap gap-2 text-xs text-white/70"><Feature icon={<Crosshair size={13} />} text="Захват слов" /><Feature icon={<Zap size={13} />} text="Комбо и бонусы" /><Feature icon={<Users size={13} />} text="Командный рейтинг" /></div>
-        <div className="mt-9 flex flex-wrap items-center gap-3"><Link href={`/games/defense?language=${language}&difficulty=${difficulty}`} className="nova-button !min-h-12 !rounded-xl !px-6"><Gamepad2 size={17} /> Начать миссию</Link><span className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-nova-accent/20 bg-black/35 px-4 text-sm font-semibold text-nova-accent backdrop-blur-md"><Coins size={17} /> {progress.credits.toLocaleString("ru-RU")} Credits</span></div>
+        <div className="mt-9 flex flex-wrap items-center gap-3"><Link href={`/games/defense?language=${language}&difficulty=${difficulty}`} className="nova-button !min-h-12 !rounded-xl !px-6"><Gamepad2 size={17} /> Начать миссию</Link><Link href="/games/shop" className="nova-button-secondary !min-h-12 !rounded-xl !border-nova-accent/20 !bg-black/35"><ShoppingBag size={17} /> Магазин</Link><span className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-nova-accent/20 bg-black/35 px-4 text-sm font-semibold text-nova-accent backdrop-blur-md"><Coins size={17} /> {progress.credits.toLocaleString("ru-RU")} Credits</span></div>
       </div>
     </section>
 
@@ -72,7 +72,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
       <aside className="space-y-4">
         <div className="relative overflow-hidden rounded-2xl border border-nova-accent/20 bg-[linear-gradient(145deg,rgba(227,182,75,0.1),rgba(255,255,255,0.025))] p-6">
           <div className="absolute -right-5 -top-5 h-28 w-28 rounded-full bg-nova-accent/[0.07] blur-2xl" />
-          <div className="relative"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl border border-nova-accent/20 bg-nova-accent/10 text-nova-accent"><Coins size={20} /></span><span className="nova-badge">{isAdmin ? "Админ-прогресс" : "Кошелёк"}</span></div><div className="mt-5 text-4xl font-semibold text-nova-accent">{progress.credits.toLocaleString("ru-RU")}</div><div className="mt-1 text-xs font-semibold">NOVA Credits</div><div className="mt-4 text-[10px] leading-5 text-nova-muted">{isAdmin ? "Начисляются за личные миссии администратора и не влияют на рейтинг учеников." : "Начисляются только за подтверждённые рейтинговые миссии."}</div></div>
+          <div className="relative"><div className="flex items-center justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl border border-nova-accent/20 bg-nova-accent/10 text-nova-accent"><Coins size={20} /></span><span className="nova-badge">{isAdmin ? "Награда ×2" : "Кошелёк"}</span></div><div className="mt-5 text-4xl font-semibold text-nova-accent">{progress.credits.toLocaleString("ru-RU")}</div><div className="mt-1 text-xs font-semibold">NOVA Credits</div><div className="mt-4 text-[10px] leading-5 text-nova-muted">{isAdmin ? "Личные миссии дают двойную награду и не влияют на рейтинг учеников." : "Начисляются только за подтверждённые рейтинговые миссии."}</div><Link href="/games/shop" className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-nova-accent/18 bg-nova-accent/[0.06] text-xs font-semibold text-nova-accent transition hover:bg-nova-accent/[0.1]"><ShoppingBag size={14} /> Потратить кредиты</Link></div>
         </div>
         <div className="data-card p-6"><Award className="text-cyan-200" size={22} /><div className="mt-5 flex items-end gap-2"><div className="text-4xl font-semibold">{progress.unlockedAchievements}</div><div className="pb-1 text-xs text-nova-muted">из {progress.achievements.length}</div></div><div className="mt-1 text-xs text-nova-muted">достижений открыто</div><div className="mt-5 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-5"><SmallStat value={progress.missions} label="миссий" /><SmallStat value={progress.bosses} label="боссов" /></div></div>
         <div className="data-card p-6"><Medal className="text-nova-accent" size={22} /><div className="mt-5 text-3xl font-semibold">{totalMissions}</div><div className="mt-1 text-xs text-nova-muted">миссий школы</div><div className="mt-5 border-t border-white/[0.06] pt-5"><div className="text-2xl font-semibold text-nova-accent">{players.length}</div><div className="text-xs text-nova-muted">игроков beta</div></div></div>
@@ -107,12 +107,14 @@ function AchievementCard({ achievement }: { achievement: DefenseAchievement }) {
 }
 
 function AchievementIcon({ id }: { id: DefenseAchievement["id"] }) {
-  if (id === "boss-hunter" || id === "commander-slayer") return <Crown size={19} />;
-  if (id === "precision") return <Target size={19} />;
+  if (id === "boss-hunter" || id === "commander-slayer" || id === "boss-veteran") return <Crown size={19} />;
+  if (id === "precision" || id === "precision-master" || id === "destroyer") return <Target size={19} />;
   if (id === "perfect-defense") return <Shield size={19} />;
-  if (id === "combo-master") return <Zap size={19} />;
-  if (id === "veteran") return <Medal size={19} />;
-  if (id === "elite-score") return <Star size={19} />;
+  if (id === "combo-starter" || id === "combo-master") return <Zap size={19} />;
+  if (id === "mission-squad" || id === "veteran" || id === "legend") return <Medal size={19} />;
+  if (id === "elite-score" || id === "legend-score") return <Star size={19} />;
+  if (id === "hard-survivor" || id === "marathon") return <Flame size={19} />;
+  if (id === "bilingual") return <Languages size={19} />;
   return <Award size={19} />;
 }
 
