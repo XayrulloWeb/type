@@ -1,17 +1,58 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Badge, Check, CircleUserRound, Coins, Crosshair, Frame, Gamepad2, Gem, ImageIcon, LockKeyhole, Music2, Orbit, ShoppingBag, Sparkles, Star, Upload, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Badge, Check, CircleUserRound, Coins, Crosshair, Frame, Gamepad2, Gem, ImageIcon, Layers3, LockKeyhole, Music2, Orbit, Search, ShoppingBag, Sparkles, Star, Upload, X, Zap } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { prisma } from "@/lib/db";
-import { DEFENSE_CATEGORY_COPY, DEFENSE_SHOP_ITEMS, getDefenseShopItem, isCustomUploadItem, normalizeDefenseLoadout, type DefenseShopCategory, type DefenseShopItem } from "@/lib/defense-shop";
+import { DEFENSE_CATEGORY_COPY, DEFENSE_SHOP_ITEMS, getDefenseShopItem, isCustomUploadItem, normalizeDefenseLoadout, type DefenseShopCategory, type DefenseShopItem, type DefenseShopRarity } from "@/lib/defense-shop";
 import { getDefensePlayerProgress } from "@/lib/defense-progress";
 import { equipDefenseItem, purchaseDefenseItem } from "./actions";
 
 const categories: DefenseShopCategory[] = ["arena", "laser", "core", "burst", "music", "avatar", "frame", "banner", "profileTitle"];
 
-export default async function DefenseShopPage({ searchParams }: { searchParams: Promise<{ status?: string; error?: string; item?: string }> }) {
+const collections = [
+  {
+    id: "aurora",
+    title: "Aurora Expedition",
+    subtitle: "Северное сияние",
+    description: "Ледяной мир, изумрудная энергия и персонажи полярной экспедиции.",
+    image: "/games/nova-defense-aurora-taiga.webp",
+    accent: "from-emerald-400/22 via-cyan-400/8",
+    itemIds: ["arena-aurora-taiga", "laser-aurora", "core-aurora", "burst-aurora", "music-floating-cities", "avatar-aurora-leopard", "frame-aurora", "banner-aurora-taiga", "title-aurora-pilot"],
+  },
+  {
+    id: "forge",
+    title: "Crimson Forge",
+    subtitle: "Огненная кузница",
+    description: "Лава, обсидиан и самые мощные красно-золотые эффекты NOVA.",
+    image: "/games/nova-defense-crimson-forge.webp",
+    accent: "from-red-500/24 via-orange-400/8",
+    itemIds: ["arena-crimson-forge", "laser-ember", "core-magma", "burst-meteor", "music-new-hero", "avatar-obsidian-dragon", "frame-inferno", "banner-crimson-forge", "title-forge-phoenix"],
+  },
+  {
+    id: "abyss",
+    title: "Abyss Academy",
+    subtitle: "Океанская лаборатория",
+    description: "Глубокий океан, жемчужные реакторы и редчайшее голубое свечение.",
+    image: "/games/nova-defense-abyss-academy.webp",
+    accent: "from-sky-500/24 via-violet-400/8",
+    itemIds: ["arena-abyss-academy", "laser-prism", "core-abyss", "burst-tide", "music-neon-horizon", "avatar-cyber-owl", "frame-abyss", "banner-abyss-academy", "title-abyss-guardian"],
+  },
+] as const;
+
+type ShopQuery = {
+  status?: string | string[];
+  error?: string | string[];
+  item?: string | string[];
+  q?: string | string[];
+  category?: string | string[];
+  rarity?: string | string[];
+  owned?: string | string[];
+  collection?: string | string[];
+};
+
+export default async function DefenseShopPage({ searchParams }: { searchParams: Promise<ShopQuery> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
   const [query, user] = await Promise.all([
@@ -19,6 +60,18 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
     prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, isActive: true, archivedAt: true } }),
   ]);
   if (!user?.isActive || user.archivedAt || !["STUDENT", "SUPER_ADMIN"].includes(user.role)) redirect("/login");
+
+  const status = firstQueryValue(query.status);
+  const error = firstQueryValue(query.error);
+  const changedItemId = firstQueryValue(query.item);
+  const search = firstQueryValue(query.q).trim();
+  const categoryQuery = firstQueryValue(query.category);
+  const rarityQuery = firstQueryValue(query.rarity);
+  const collectionQuery = firstQueryValue(query.collection);
+  const selectedCategory = categories.includes(categoryQuery as DefenseShopCategory) ? categoryQuery as DefenseShopCategory : null;
+  const selectedRarity = (["base", "rare", "epic", "legendary"] as DefenseShopRarity[]).includes(rarityQuery as DefenseShopRarity) ? rarityQuery as DefenseShopRarity : null;
+  const selectedCollection = collections.find((collection) => collection.id === collectionQuery) ?? null;
+  const ownedOnly = firstQueryValue(query.owned) === "1";
 
   const isAdmin = user.role === "SUPER_ADMIN";
   const [progress, purchases, savedLoadout] = await Promise.all([
@@ -28,31 +81,41 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
   ]);
   const loadout = normalizeDefenseLoadout(savedLoadout);
   const owned = new Set(purchases.map((purchase) => purchase.itemId));
-  const changedItem = query.item ? getDefenseShopItem(query.item) : undefined;
-  const message = query.status === "bought"
+  const changedItem = changedItemId ? getDefenseShopItem(changedItemId) : undefined;
+  const message = status === "bought"
     ? isCustomUploadItem(changedItem ?? DEFENSE_SHOP_ITEMS[0])
       ? `${changedItem?.title ?? "Персональный слот"} открыт. Теперь загрузите свой файл.`
       : `${changedItem?.title ?? "Предмет"} куплен и сразу экипирован.`
-    : query.status === "uploaded"
+    : status === "uploaded"
       ? "Личный файл безопасно сохранён и сразу выбран в аккаунте."
-    : query.status === "equipped"
+    : status === "equipped"
       ? `${changedItem?.title ?? "Предмет"} теперь используется в аккаунте.`
-      : query.status === "owned"
+      : status === "owned"
         ? "Этот предмет уже находится в вашей коллекции."
-        : query.error === "credits"
+        : error === "credits"
           ? "Недостаточно NOVA Credits. Завершайте миссии и побеждайте командиров."
-          : query.error === "not-owned"
+          : error === "not-owned"
             ? "Сначала купите этот предмет."
-            : query.error === "upload-first"
+            : error === "upload-first"
               ? "Сначала загрузите личный файл, затем его можно экипировать."
-              : query.error === "avatar-format"
+              : error === "avatar-format"
                 ? "Для аватара нужен JPG, PNG или WebP размером до 4 МБ."
-                : query.error === "music-format"
+                : error === "music-format"
                   ? "Для личной музыки нужен настоящий MP3-файл размером до 12 МБ."
-            : query.error
+            : error
               ? "Действие не удалось завершить. Попробуйте ещё раз."
               : null;
   const ownedCount = DEFENSE_SHOP_ITEMS.filter((item) => item.isDefault || owned.has(item.id)).length;
+  const normalizedSearch = search.toLocaleLowerCase("ru-RU");
+  const visibleItems = DEFENSE_SHOP_ITEMS.filter((item) => {
+    if (selectedCategory && item.category !== selectedCategory) return false;
+    if (selectedRarity && item.rarity !== selectedRarity) return false;
+    if (ownedOnly && !item.isDefault && !owned.has(item.id)) return false;
+    if (selectedCollection && !selectedCollection.itemIds.some((itemId) => itemId === item.id)) return false;
+    if (!normalizedSearch) return true;
+    return `${item.title} ${item.subtitle} ${item.description}`.toLocaleLowerCase("ru-RU").includes(normalizedSearch);
+  });
+  const hasFilters = Boolean(search || selectedCategory || selectedRarity || ownedOnly || selectedCollection);
 
   return <div className="min-h-screen"><Header user={session.user} /><main className="page-shell !max-w-[86rem]">
     <section className="relative overflow-hidden rounded-[2rem] border border-nova-accent/15 bg-[#0a1012] shadow-[0_35px_100px_rgba(0,0,0,0.42)]">
@@ -75,18 +138,58 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
       </div>
     </section>
 
-    {message && <div className={query.error ? "mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.06] px-5 py-4 text-sm text-red-100" : "mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-4 text-sm text-emerald-100"}>{message}</div>}
+    {message && <div className={error ? "mt-5 rounded-2xl border border-red-400/20 bg-red-400/[0.06] px-5 py-4 text-sm text-red-100" : "mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-4 text-sm text-emerald-100"}>{message}</div>}
+
+    <section className="mt-8">
+      <div className="flex items-end justify-between gap-4"><div><p className="page-eyebrow">Новые миры</p><h2 className="mt-1 text-2xl font-semibold">Тематические коллекции</h2></div><div className="hidden text-xs text-nova-muted sm:block">По 9 связанных предметов в каждом комплекте</div></div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        {collections.map((collection) => {
+          const collectionItems = DEFENSE_SHOP_ITEMS.filter((item) => collection.itemIds.some((itemId) => itemId === item.id));
+          const collectionOwned = collectionItems.filter((item) => item.isDefault || owned.has(item.id)).length;
+          const collectionPrice = collectionItems.reduce((sum, item) => sum + item.price, 0);
+          const active = selectedCollection?.id === collection.id;
+          return <Link key={collection.id} href={`/games/shop?collection=${collection.id}#catalog`} className={active ? "group relative min-h-64 overflow-hidden rounded-[1.6rem] border border-nova-accent/45 shadow-[0_0_40px_rgba(227,182,75,0.1)]" : "group relative min-h-64 overflow-hidden rounded-[1.6rem] border border-white/[0.1] transition hover:-translate-y-0.5 hover:border-white/20"}>
+            <span className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${collection.image})` }} />
+            <span className={`absolute inset-0 bg-gradient-to-t ${collection.accent} to-black/10`} />
+            <span className="absolute inset-0 bg-gradient-to-t from-[#050809] via-[#050809]/20 to-transparent" />
+            <span className="relative flex h-full min-h-64 flex-col justify-end p-6">
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-nova-accent">{collection.subtitle}</span>
+              <span className="mt-2 text-2xl font-semibold text-white">{collection.title}</span>
+              <span className="mt-2 max-w-sm text-[11px] leading-5 text-white/58">{collection.description}</span>
+              <span className="mt-5 flex items-center justify-between border-t border-white/10 pt-4 text-[10px]"><span className="text-white/48">{collectionOwned} / {collectionItems.length} открыто · {collectionPrice.toLocaleString("ru-RU")} Credits</span><span className="inline-flex items-center gap-1 font-semibold text-white">Открыть <ArrowRight size={12} /></span></span>
+            </span>
+          </Link>;
+        })}
+      </div>
+    </section>
+
+    <section id="catalog" className="mt-8 scroll-mt-24 rounded-[1.6rem] border border-white/[0.08] bg-white/[0.018] p-4 sm:p-5">
+      <form action="/games/shop#catalog" method="get" className="grid gap-3 lg:grid-cols-[minmax(15rem,1fr)_13rem_12rem_auto_auto] lg:items-center">
+        <label className="relative block"><Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" size={15} /><input name="q" defaultValue={search} className="nova-input !min-h-11 !pl-10" placeholder="Найти предмет, музыку или фон" /></label>
+        <select name="category" defaultValue={selectedCategory ?? ""} className="nova-input !min-h-11">
+          <option value="">Все разделы</option>
+          {categories.map((category) => <option key={category} value={category}>{DEFENSE_CATEGORY_COPY[category].title}</option>)}
+        </select>
+        <select name="rarity" defaultValue={selectedRarity ?? ""} className="nova-input !min-h-11">
+          <option value="">Любая редкость</option><option value="base">Базовые</option><option value="rare">Редкие</option><option value="epic">Эпические</option><option value="legendary">Легендарные</option>
+        </select>
+        <label className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-4 text-xs text-white/62 transition hover:border-white/15"><input name="owned" value="1" defaultChecked={ownedOnly} type="checkbox" className="accent-[#e3b64b]" /> Только мои</label>
+        <button className="nova-button !min-h-11 !rounded-xl" type="submit"><Search size={14} /> Показать</button>
+      </form>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4"><div className="flex flex-wrap gap-2"><Link href="/games/shop#catalog" className={!hasFilters ? "nova-badge" : "rounded-full border border-white/[0.08] px-3 py-1.5 text-[9px] text-white/45 transition hover:text-white"}>Все 66</Link>{categories.map((category) => <Link key={category} href={`/games/shop?category=${category}#catalog`} className={selectedCategory === category ? "nova-badge" : "rounded-full border border-white/[0.08] px-3 py-1.5 text-[9px] text-white/45 transition hover:text-white"}>{DEFENSE_CATEGORY_COPY[category].eyebrow}</Link>)}</div><div className="flex items-center gap-3 text-[10px] text-white/35"><span className="inline-flex items-center gap-1.5"><Layers3 size={12} /> Найдено: {visibleItems.length}</span>{hasFilters && <Link href="/games/shop#catalog" className="inline-flex items-center gap-1 text-nova-accent"><X size={12} /> Сбросить</Link>}</div></div>
+    </section>
 
     <section className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.018] p-3 sm:grid-cols-3 lg:grid-cols-5">
       {categories.map((category) => {
         const equipped = DEFENSE_SHOP_ITEMS.find((item) => item.category === category && item.value === loadout[category]);
-        return <div key={category} className="rounded-xl border border-white/[0.055] bg-black/15 p-3"><div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.15em] text-white/28"><CategoryIcon category={category} /> {DEFENSE_CATEGORY_COPY[category].eyebrow}</div><div className="mt-2 truncate text-xs font-semibold text-white/78">{equipped?.title}</div></div>;
+        return <Link href={`/games/shop?category=${category}#catalog`} key={category} className="rounded-xl border border-white/[0.055] bg-black/15 p-3 transition hover:border-nova-accent/20 hover:bg-nova-accent/[0.035]"><div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.15em] text-white/28"><CategoryIcon category={category} /> {DEFENSE_CATEGORY_COPY[category].eyebrow}</div><div className="mt-2 truncate text-xs font-semibold text-white/78">{equipped?.title}</div></Link>;
       })}
     </section>
 
     {categories.map((category) => {
       const copy = DEFENSE_CATEGORY_COPY[category];
-      const items = DEFENSE_SHOP_ITEMS.filter((item) => item.category === category);
+      const items = visibleItems.filter((item) => item.category === category);
+      if (!items.length) return null;
       return <section key={category} className="mt-10 scroll-mt-24" id={category}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="page-eyebrow">{copy.eyebrow}</p><h2 className="mt-1 text-2xl font-semibold">{copy.title}</h2><p className="mt-2 text-xs text-nova-muted">{copy.description}</p></div><div className="text-xs text-nova-muted">{items.filter((item) => item.isDefault || owned.has(item.id)).length} из {items.length} открыто</div></div>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -102,6 +205,8 @@ export default async function DefenseShopPage({ searchParams }: { searchParams: 
         </div>
       </section>;
     })}
+
+    {visibleItems.length === 0 && <section className="mt-10 rounded-[1.6rem] border border-dashed border-white/[0.12] bg-white/[0.018] px-6 py-16 text-center"><Search className="mx-auto text-white/20" size={32} /><h2 className="mt-5 text-xl font-semibold">Ничего не найдено</h2><p className="mt-2 text-sm text-nova-muted">Попробуйте изменить запрос или убрать часть фильтров.</p><Link href="/games/shop#catalog" className="nova-button-secondary mt-6 !rounded-xl"><X size={14} /> Сбросить фильтры</Link></section>}
 
     <section className="mt-10 grid gap-4 lg:grid-cols-3">
       <InfoCard icon={<Zap size={19} />} title={isAdmin ? "Награда ×2" : "Честная награда"} text={isAdmin ? "Личные миссии администратора дают вдвое больше кредитов и не входят в рейтинг учеников." : "Кредиты даются только за полноценную миссию: от 45 секунд, 10 целей и 80% точности."} />
@@ -169,4 +274,8 @@ function Rarity({ rarity }: { rarity: DefenseShopItem["rarity"] }) {
 
 function InfoCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return <div className="data-card p-5"><span className="grid h-10 w-10 place-items-center rounded-xl border border-nova-accent/18 bg-nova-accent/[0.07] text-nova-accent">{icon}</span><h3 className="mt-4 font-semibold">{title}</h3><p className="mt-2 text-xs leading-5 text-nova-muted">{text}</p></div>;
+}
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
