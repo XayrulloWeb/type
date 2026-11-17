@@ -1,13 +1,13 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Badge, Check, CircleUserRound, Coins, Crosshair, Frame, Gamepad2, Gem, ImageIcon, Layers3, LockKeyhole, Music2, Orbit, Search, ShoppingBag, Sparkles, Star, Upload, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Badge, Check, CircleUserRound, Coins, Frame, Gamepad2, Gem, ImageIcon, Layers3, LockKeyhole, Music2, Orbit, Search, ShoppingBag, Sparkles, Star, X, Zap } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { prisma } from "@/lib/db";
 import { DEFENSE_CATEGORY_COPY, DEFENSE_SHOP_ITEMS, getDefenseShopItem, isCustomUploadItem, normalizeDefenseLoadout, type DefenseShopCategory, type DefenseShopItem, type DefenseShopRarity } from "@/lib/defense-shop";
 import { getDefensePlayerProgress } from "@/lib/defense-progress";
-import { equipDefenseItem, purchaseDefenseItem } from "./actions";
+import { ShopItemAction, ShopMediaUpload } from "@/components/games/ShopInteractiveForms";
 
 const categories: DefenseShopCategory[] = ["arena", "laser", "core", "burst", "music", "avatar", "frame", "banner", "profileTitle"];
 
@@ -233,13 +233,9 @@ function StoreCard({ item, owned, equipped, affordable, balance, customUrl }: { 
       {item.audio && <div className="mt-3 rounded-xl border border-white/[0.07] bg-black/25 p-2.5"><audio className="h-8 w-full" controls preload="none"><source src={item.audio.src} type="audio/mpeg" /></audio><p className="mt-2 text-[8px] leading-4 text-white/35"><a className="transition hover:text-nova-accent" href={item.audio.sourceUrl} target="_blank" rel="noreferrer">{item.audio.credit}</a> · <a className="transition hover:text-nova-accent" href={item.audio.licenseUrl} target="_blank" rel="noreferrer">CC BY 4.0</a></p></div>}
       {custom && owned ? <div className="mt-4 space-y-2">
         {customKind === "music" && customUrl && <audio className="h-8 w-full" controls preload="none"><source src={customUrl} type="audio/mpeg" /></audio>}
-        <form action="/api/profile/media" method="post" encType="multipart/form-data" className="rounded-xl border border-white/[0.08] bg-black/20 p-3">
-          <input type="hidden" name="kind" value={customKind} />
-          <input className="block w-full text-[10px] text-white/45 file:mr-2 file:rounded-lg file:border-0 file:bg-white/[0.08] file:px-3 file:py-2 file:text-[9px] file:font-semibold file:text-white/70" type="file" name="file" required accept={customKind === "music" ? "audio/mpeg,.mp3" : "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"} />
-          <button className="nova-button mt-3 !min-h-9 !w-full !rounded-lg" type="submit"><Upload size={13} /> {customUrl ? "Заменить файл" : "Загрузить и использовать"}</button>
-        </form>
-        {customUrl && (equipped ? <div className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-nova-accent/18 bg-nova-accent/[0.055] text-xs font-semibold text-nova-accent"><Check size={14} /> Используется</div> : <form action={equipDefenseItem}><input type="hidden" name="itemId" value={item.id} /><button className="nova-button-secondary !min-h-10 !w-full !rounded-xl" type="submit"><Crosshair size={14} /> Экипировать</button></form>)}
-      </div> : equipped ? <div className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-nova-accent/18 bg-nova-accent/[0.055] text-xs font-semibold text-nova-accent"><Check size={14} /> Используется</div> : owned ? <form action={equipDefenseItem} className="mt-4"><input type="hidden" name="itemId" value={item.id} /><button className="nova-button-secondary !min-h-10 !w-full !rounded-xl" type="submit"><Crosshair size={14} /> Экипировать</button></form> : <form action={purchaseDefenseItem} className="mt-4"><input type="hidden" name="itemId" value={item.id} /><button className="nova-button !min-h-10 !w-full !rounded-xl" type="submit"><Sparkles size={14} /> Купить за {item.price}</button>{!affordable && <p className="mt-2 text-center text-[8px] text-white/28">Не хватает {(item.price - balance).toLocaleString("ru-RU")} кредитов</p>}</form>}
+        <ShopMediaUpload kind={customKind} customUrl={customUrl} />
+        {customUrl && (equipped ? <div className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-nova-accent/18 bg-nova-accent/[0.055] text-xs font-semibold text-nova-accent"><Check size={14} /> Используется</div> : <ShopItemAction itemId={item.id} kind="equip" />)}
+      </div> : equipped ? <div className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-xl border border-nova-accent/18 bg-nova-accent/[0.055] text-xs font-semibold text-nova-accent"><Check size={14} /> Используется</div> : owned ? <ShopItemAction className="mt-4" itemId={item.id} kind="equip" /> : <div className="mt-4"><ShopItemAction itemId={item.id} kind="purchase" price={item.price} />{!affordable && <p className="mt-2 text-center text-[8px] text-white/28">Не хватает {(item.price - balance).toLocaleString("ru-RU")} кредитов</p>}</div>}
     </div>
   </article>;
 }

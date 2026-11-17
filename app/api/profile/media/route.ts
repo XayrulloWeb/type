@@ -94,6 +94,11 @@ export async function POST(request: Request) {
 }
 
 function redirectToShop(request: Request, key: "status" | "error", value: string, anchor?: "avatar" | "music") {
+  if (request.headers.get("accept")?.includes("application/json")) {
+    const ok = key === "status";
+    const status = ok ? 200 : value === "login" ? 401 : value === "not-owned" ? 403 : value === "media-failed" ? 500 : 400;
+    return NextResponse.json(ok ? { ok: true, status: value, kind: anchor } : { ok: false, error: value, kind: anchor }, { status });
+  }
   const url = new URL("/games/shop", request.url);
   url.searchParams.set(key, value);
   if (anchor) url.hash = anchor;
