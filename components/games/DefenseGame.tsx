@@ -871,7 +871,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
             return <div key={target.id} data-target-kind={target.kind} data-boss-phases={target.kind === "boss" ? completedBossPhases : undefined} className={clsx("defense-target absolute max-w-[calc(100%-1.5rem)] -translate-x-1/2 rounded-lg border bg-[#071013]/88 px-2.5 py-2 font-mono text-[clamp(0.7rem,2.6vw,0.875rem)] font-semibold tracking-[0.08em] shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm sm:px-3", targetKindClass(target.kind), activeTarget?.id === target.id ? "border-cyan-200/80 shadow-[0_0_30px_rgba(83,221,235,0.34)]" : "border-white/12")} style={{ left: `${target.x}%`, top: `${target.y}%` }}>
               {target.kind !== "normal" && <span className="mb-1 flex items-center gap-1 font-sans text-[7px] font-bold uppercase tracking-[0.16em] opacity-80"><TargetKindIcon kind={target.kind} size={target.kind === "boss" ? 11 : 9} />{DEFENSE_TARGETS[target.kind].shortLabel}</span>}
               {target.kind === "boss" && <span className="defense-boss-health mb-2 grid grid-cols-3 gap-1">{[0, 1, 2].map((phase) => <span key={phase} className={phase < completedBossPhases ? "defense-boss-health-complete" : phase === completedBossPhases ? "defense-boss-health-active" : ""} />)}</span>}
-              <span className="whitespace-nowrap">{letters.map((character, index) => <span key={`${index}-${character}`} className={index < typedInPhase ? "text-nova-accent" : index === typedInPhase && activeTarget?.id === target.id ? "text-cyan-200 underline decoration-cyan-300/70 underline-offset-4" : "text-white/82"}>{character}</span>)}</span>
+              <span className="block max-w-full break-all">{letters.map((character, index) => <span key={`${index}-${character}`} className={index < typedInPhase ? "text-nova-accent" : index === typedInPhase && activeTarget?.id === target.id ? "text-cyan-200 underline decoration-cyan-300/70 underline-offset-4" : "text-white/82"}>{character}</span>)}</span>
               {target.kind === "boss" && <span className="mt-2 block font-sans text-[7px] uppercase tracking-[0.18em] text-white/38">Щит {Math.min(3, completedBossPhases + 1)} / 3</span>}
             </div>;
           })}
@@ -1116,13 +1116,13 @@ function clampVolume(value: number) {
 }
 
 function targetHorizontalMarginPercent(word: string, kind: DefenseTargetKind, arenaWidth: number) {
-  const safeArenaWidth = Math.max(280, arenaWidth);
+  const safeArenaWidth = Math.max(1, arenaWidth);
   const characterWidth = safeArenaWidth < 640 ? 8 : 9.4;
   const wordWidth = Array.from(word).length * characterWidth + 28;
   const badgeWidth = kind === "normal" ? 0 : kind === "boss" ? 112 : 88;
-  const targetWidth = Math.min(safeArenaWidth - 24, Math.max(wordWidth, badgeWidth));
+  const targetWidth = Math.min(Math.max(1, safeArenaWidth - 24), Math.max(wordWidth, badgeWidth));
   const comfortMargin = safeArenaWidth < 640 ? 14 : 11;
-  return Math.min(46, Math.max(comfortMargin, (targetWidth / 2 + 12) / safeArenaWidth * 100));
+  return Math.min(49, Math.max(comfortMargin, (targetWidth / 2 + 14) / safeArenaWidth * 100));
 }
 
 function targetSpawnX(word: string, kind: DefenseTargetKind, wordIndex: number, arenaWidth: number) {
