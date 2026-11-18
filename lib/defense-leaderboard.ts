@@ -14,33 +14,56 @@ export interface DefenseClassRanking {
   isQualified: boolean;
 }
 
-export async function getDefenseRankings(language: DefenseLanguage, difficulty: DefenseDifficulty, take = 12) {
-  const where = {
+export async function getDefenseRankings(language: DefenseLanguage, difficulty: DefenseDifficulty) {
+  const baseWhere = {
     game: "defense",
     language,
     difficulty,
-    isRanked: true,
     user: { role: "STUDENT", isActive: true, archivedAt: null },
   } as const;
+  const rankedWhere = { ...baseWhere, isRanked: true } as const;
 
-  const bestScores = await prisma.gameResult.groupBy({
-    by: ["userId"],
-    where,
-    _max: { score: true },
-    orderBy: { _max: { score: "desc" } },
-    take: 500,
-  });
+  const [bestScores, participantBestScores] = await Promise.all([
+    prisma.gameResult.groupBy({
+      by: ["userId"],
+      where: rankedWhere,
+      _max: { score: true },
+      orderBy: { _max: { score: "desc" } },
+      take: 500,
+    }),
+    prisma.gameResult.groupBy({
+      by: ["userId"],
+      where: baseWhere,
+      _max: { score: true },
+      orderBy: { _max: { score: "desc" } },
+      take: 500,
+    }),
+  ]);
 
-  if (bestScores.length === 0) return { classes: [] as DefenseClassRanking[], students: [] };
+  if (participantBestScores.length === 0) {
+    return { classes: [] as DefenseClassRanking[], students: [], pendingStudents: [], participantCount: 0 };
+  }
 
-  const candidates = await prisma.gameResult.findMany({
-    where: {
-      ...where,
-      OR: bestScores.map((item) => ({ userId: item.userId, score: item._max.score ?? -1 })),
-    },
-    orderBy: [{ score: "desc" }, { wpm: "desc" }, { accuracy: "desc" }, { createdAt: "asc" }],
-    include: { user: { include: { class: true } } },
-  });
+  const [candidates, participantCandidates] = await Promise.all([
+    bestScores.length > 0
+      ? prisma.gameResult.findMany({
+          where: {
+            ...rankedWhere,
+            OR: bestScores.map((item) => ({ userId: item.userId, score: item._max.score ?? -1 })),
+          },
+          orderBy: [{ score: "desc" }, { wpm: "desc" }, { accuracy: "desc" }, { createdAt: "asc" }],
+          include: { user: { include: { class: true } } },
+        })
+      : Promise.resolve([]),
+    prisma.gameResult.findMany({
+      where: {
+        ...baseWhere,
+        OR: participantBestScores.map((item) => ({ userId: item.userId, score: item._max.score ?? -1 })),
+      },
+      orderBy: [{ score: "desc" }, { wpm: "desc" }, { accuracy: "desc" }, { createdAt: "asc" }],
+      include: { user: { include: { class: true } } },
+    }),
+  ]);
 
   const seen = new Set<string>();
   const bestPerStudent = candidates.filter((result) => {
@@ -48,6 +71,14 @@ export async function getDefenseRankings(language: DefenseLanguage, difficulty: 
     seen.add(result.userId);
     return true;
   });
+  const participantSeen = new Set<string>();
+  const bestPerParticipant = participantCandidates.filter((result) => {
+    if (participantSeen.has(result.userId)) return false;
+    participantSeen.add(result.userId);
+    return true;
+  });
+  const rankedStudentIds = new Set(bestPerStudent.map((result) => result.userId));
+  const pendingStudents = bestPerParticipant.filter((result) => !rankedStudentIds.has(result.userId));
 
   const byClass = new Map<string, typeof bestPerStudent>();
   for (const result of bestPerStudent) {
@@ -72,5 +103,5 @@ export async function getDefenseRankings(language: DefenseLanguage, difficulty: 
     } satisfies DefenseClassRanking;
   }).sort((a, b) => Number(b.isQualified) - Number(a.isQualified) || b.score - a.score || b.bossesDestroyed - a.bossesDestroyed || a.className.localeCompare(b.className, "ru"));
 
-  return { classes, students: bestPerStudent.slice(0, take) };
+  return { classes, students: bestPerStudent, pendingStudents, participantCount: bestPerParticipant.length };
 }
