@@ -207,6 +207,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   const audioRef = useRef<AudioContext | null>(null);
   const musicRef = useRef<MusicEngine | null>(null);
   const musicTrackRef = useRef<HTMLAudioElement | null>(null);
+  const musicVolumeRef = useRef(0.42);
   const preferencesReadyRef = useRef(false);
 
   const setPhase = useCallback((phase: Phase) => {
@@ -271,7 +272,19 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     if (bossImpactTimerRef.current !== null) window.clearTimeout(bossImpactTimerRef.current);
   }, []);
 
-  const stopAmbientMusic = useCallback(() => {
+  const pauseAmbientMusic = useCallback(() => {
+    const track = musicTrackRef.current;
+    if (track) track.pause();
+    const engine = musicRef.current;
+    if (!engine) return;
+    const context = audioRef.current;
+    if (context) {
+      engine.gain.gain.cancelScheduledValues(context.currentTime);
+      engine.gain.gain.setTargetAtTime(0.0001, context.currentTime, 0.08);
+    }
+  }, []);
+
+  const destroyAmbientMusic = useCallback(() => {
     const track = musicTrackRef.current;
     if (track) {
       track.pause();
@@ -296,19 +309,34 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
 
   const startAmbientMusic = useCallback(async () => {
     if (!musicEnabled) return;
-    stopAmbientMusic();
+    const existingTrack = musicTrackRef.current;
+    if (existingTrack) {
+      existingTrack.volume = Math.min(1, musicVolumeRef.current * 0.72);
+      try { await existingTrack.play(); } catch { /* waits for the next user gesture */ }
+      return;
+    }
+    const existingEngine = musicRef.current;
+    if (existingEngine) {
+      const context = audioRef.current;
+      if (!context) return;
+      if (context.state === "suspended") await context.resume();
+      existingEngine.gain.gain.cancelScheduledValues(context.currentTime);
+      existingEngine.gain.gain.setTargetAtTime(Math.max(0.0001, musicVolumeRef.current * 0.038), context.currentTime, 0.12);
+      return;
+    }
     const selectedMusic = getDefenseShopItemForCategory("music", initialLoadout.music);
     const selectedTrack = initialLoadout.music === "custom" ? customMusicUrl : selectedMusic?.audio?.src;
     if (selectedTrack) {
       const track = new Audio(selectedTrack);
       track.loop = true;
       track.preload = "auto";
-      track.volume = Math.min(1, musicVolume * 0.72);
+      track.volume = Math.min(1, musicVolumeRef.current * 0.72);
       musicTrackRef.current = track;
       try {
         await track.play();
       } catch {
-        musicTrackRef.current = null;
+        // Autoplay can be blocked until the next user gesture. Keep the same
+        // element so resuming never loses its playback position.
       }
       return;
     }
@@ -343,10 +371,10 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     lfo.connect(lfoDepth).connect(filter.frequency);
     lfo.start();
     master.gain.setValueAtTime(0.0001, context.currentTime);
-    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, musicVolume * 0.038), context.currentTime + 0.9);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, musicVolumeRef.current * 0.038), context.currentTime + 0.9);
     filter.connect(compressor).connect(master).connect(context.destination);
     musicRef.current = { gain: master, oscillators, lfo };
-  }, [arena, customMusicUrl, initialLoadout.music, musicEnabled, musicVolume, stopAmbientMusic]);
+  }, [arena, customMusicUrl, initialLoadout.music, musicEnabled]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -370,14 +398,29 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   }, [effectsVolume, musicEnabled, musicVolume, soundEnabled]);
 
   useEffect(() => {
-    const activePhase = phaseState === "countdown" || phaseState === "playing" || phaseState === "paused";
-    if (!musicEnabled || !activePhase) {
-      stopAmbientMusic();
+    musicVolumeRef.current = musicVolume;
+    const track = musicTrackRef.current;
+    if (track) track.volume = Math.min(1, musicVolume * 0.72);
+    const engine = musicRef.current;
+    const context = audioRef.current;
+    if (engine && context) {
+      const shouldBeAudible = musicEnabled && (phaseRef.current === "countdown" || phaseRef.current === "playing" || phaseRef.current === "paused");
+      engine.gain.gain.cancelScheduledValues(context.currentTime);
+      engine.gain.gain.setTargetAtTime(shouldBeAudible ? Math.max(0.0001, musicVolume * 0.038) : 0.0001, context.currentTime, 0.08);
+    }
+  }, [musicEnabled, musicVolume]);
+
+  const ambientMusicActive = musicEnabled && (phaseState === "countdown" || phaseState === "playing" || phaseState === "paused");
+
+  useEffect(() => {
+    if (!ambientMusicActive) {
+      pauseAmbientMusic();
       return;
     }
     void startAmbientMusic();
-    return stopAmbientMusic;
-  }, [musicEnabled, phaseState, startAmbientMusic, stopAmbientMusic]);
+  }, [ambientMusicActive, pauseAmbientMusic, startAmbientMusic]);
+
+  useEffect(() => destroyAmbientMusic, [destroyAmbientMusic]);
 
   const playTone = useCallback((kind: "hit" | "destroy" | "error" | "breach" | "powerup" | "boss") => {
     if (!soundEnabled) return;
