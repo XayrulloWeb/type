@@ -204,6 +204,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   const bossImpactTimerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const saveDurationRef = useRef(0);
+  const arenaRef = useRef<HTMLElement | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const musicRef = useRef<MusicEngine | null>(null);
   const musicTrackRef = useRef<HTMLAudioElement | null>(null);
@@ -271,6 +272,28 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
     if (bossWarningTimerRef.current !== null) window.clearTimeout(bossWarningTimerRef.current);
     if (bossImpactTimerRef.current !== null) window.clearTimeout(bossImpactTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    const arenaElement = arenaRef.current;
+    if (!arenaElement) return;
+    const keepTargetsInsideArena = (arenaWidth: number) => {
+      let changed = false;
+      const nextTargets = targetsRef.current.map((target) => {
+        const margin = targetHorizontalMarginPercent(target.word, target.kind, arenaWidth);
+        const x = Math.min(100 - margin, Math.max(margin, target.x));
+        if (x === target.x) return target;
+        changed = true;
+        return { ...target, x };
+      });
+      if (changed) setTargets(nextTargets);
+    };
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) keepTargetsInsideArena(width);
+    });
+    observer.observe(arenaElement);
+    return () => observer.disconnect();
+  }, [setTargets]);
 
   const pauseAmbientMusic = useCallback(() => {
     const track = musicTrackRef.current;
@@ -641,12 +664,13 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
         const wordIndex = wordCursorRef.current;
         const kind = defenseTargetKind(wordIndex, difficulty);
         const targetProfile = DEFENSE_TARGETS[kind];
-        const lane = wordIndex % 6;
-        const x = kind === "boss" ? 50 : 7 + lane * 12.8 + (wordIndex * 17 % 6);
+        const word = challenge.words[wordIndex];
+        const arenaWidth = arenaRef.current?.clientWidth ?? window.innerWidth;
+        const x = targetSpawnX(word, kind, wordIndex, arenaWidth);
         nextTargets = [...nextTargets, {
           id: targetIdRef.current++,
           wordIndex,
-          word: challenge.words[wordIndex],
+          word,
           x,
           y: 13,
           progress: 0,
@@ -817,7 +841,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
   }
 
   return <main className="relative mx-auto w-full max-w-[1920px] overflow-hidden bg-[#050809]">
-    <section className={clsx("defense-arena relative h-[calc(100svh-65px)] min-h-[640px] overflow-hidden border-t border-white/[0.04]", bossImpact && "defense-boss-impact")} aria-label="NOVA Defense game arena">
+    <section ref={arenaRef} className={clsx("defense-arena relative h-[calc(100svh-65px)] min-h-[640px] overflow-hidden border-t border-white/[0.04]", bossImpact && "defense-boss-impact")} aria-label="NOVA Defense game arena">
       <div className="absolute inset-0 bg-cover bg-center transition-[background-image] duration-700" style={{ backgroundImage: `url(${arenaThemes[arena].image})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,transparent_0,rgba(3,7,8,0.05)_30%,rgba(3,7,8,0.58)_100%)]" />
       <div className="defense-scan absolute inset-0 opacity-25" />
@@ -844,7 +868,7 @@ export function DefenseGame({ initialLanguage, initialDifficulty, adminMode, own
             const letters = Array.from(target.word);
             const typedInPhase = target.progress % letters.length;
             const completedBossPhases = target.kind === "boss" ? Math.floor(target.progress / letters.length) : 0;
-            return <div key={target.id} data-target-kind={target.kind} data-boss-phases={target.kind === "boss" ? completedBossPhases : undefined} className={clsx("defense-target absolute -translate-x-1/2 rounded-lg border bg-[#071013]/88 px-3 py-2 font-mono text-sm font-semibold tracking-[0.08em] shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm", targetKindClass(target.kind), activeTarget?.id === target.id ? "border-cyan-200/80 shadow-[0_0_30px_rgba(83,221,235,0.34)]" : "border-white/12")} style={{ left: `${target.x}%`, top: `${target.y}%` }}>
+            return <div key={target.id} data-target-kind={target.kind} data-boss-phases={target.kind === "boss" ? completedBossPhases : undefined} className={clsx("defense-target absolute max-w-[calc(100%-1.5rem)] -translate-x-1/2 rounded-lg border bg-[#071013]/88 px-2.5 py-2 font-mono text-[clamp(0.7rem,2.6vw,0.875rem)] font-semibold tracking-[0.08em] shadow-[0_10px_30px_rgba(0,0,0,0.42)] backdrop-blur-sm sm:px-3", targetKindClass(target.kind), activeTarget?.id === target.id ? "border-cyan-200/80 shadow-[0_0_30px_rgba(83,221,235,0.34)]" : "border-white/12")} style={{ left: `${target.x}%`, top: `${target.y}%` }}>
               {target.kind !== "normal" && <span className="mb-1 flex items-center gap-1 font-sans text-[7px] font-bold uppercase tracking-[0.16em] opacity-80"><TargetKindIcon kind={target.kind} size={target.kind === "boss" ? 11 : 9} />{DEFENSE_TARGETS[target.kind].shortLabel}</span>}
               {target.kind === "boss" && <span className="defense-boss-health mb-2 grid grid-cols-3 gap-1">{[0, 1, 2].map((phase) => <span key={phase} className={phase < completedBossPhases ? "defense-boss-health-complete" : phase === completedBossPhases ? "defense-boss-health-active" : ""} />)}</span>}
               <span className="whitespace-nowrap">{letters.map((character, index) => <span key={`${index}-${character}`} className={index < typedInPhase ? "text-nova-accent" : index === typedInPhase && activeTarget?.id === target.id ? "text-cyan-200 underline decoration-cyan-300/70 underline-offset-4" : "text-white/82"}>{character}</span>)}</span>
@@ -1089,6 +1113,25 @@ function emptyActivePowerups(): ActivePowerups {
 
 function clampVolume(value: number) {
   return Math.min(1, Math.max(0, value));
+}
+
+function targetHorizontalMarginPercent(word: string, kind: DefenseTargetKind, arenaWidth: number) {
+  const safeArenaWidth = Math.max(280, arenaWidth);
+  const characterWidth = safeArenaWidth < 640 ? 8 : 9.4;
+  const wordWidth = Array.from(word).length * characterWidth + 28;
+  const badgeWidth = kind === "normal" ? 0 : kind === "boss" ? 112 : 88;
+  const targetWidth = Math.min(safeArenaWidth - 24, Math.max(wordWidth, badgeWidth));
+  const comfortMargin = safeArenaWidth < 640 ? 14 : 11;
+  return Math.min(46, Math.max(comfortMargin, (targetWidth / 2 + 12) / safeArenaWidth * 100));
+}
+
+function targetSpawnX(word: string, kind: DefenseTargetKind, wordIndex: number, arenaWidth: number) {
+  if (kind === "boss") return 50;
+  const margin = targetHorizontalMarginPercent(word, kind, arenaWidth);
+  const lane = wordIndex % 6;
+  const lanePosition = margin + (100 - margin * 2) * lane / 5;
+  const jitter = ((wordIndex * 17 % 7) - 3) * 0.65;
+  return Math.min(100 - margin, Math.max(margin, lanePosition + jitter));
 }
 
 function liveAccuracy(stats: LiveStats) {
