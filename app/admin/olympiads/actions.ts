@@ -6,6 +6,7 @@ import { adminActivity } from "@/lib/activity";
 import { requireSuperAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { generateUniqueOlympiadText } from "@/lib/olympiad-text";
+import { OLYMPIAD_START_COUNTDOWN_SECONDS } from "@/lib/olympiad-timing";
 
 const allowedLanguages = new Set(["ru", "en"]);
 
@@ -83,7 +84,7 @@ export async function startOlympiad(formData: FormData) {
   });
   if (!olympiad || olympiad.status !== "WAITING" || olympiad._count.participants < 1) return;
 
-  const startedAt = new Date(Date.now() + 5_000);
+  const startedAt = new Date(Date.now() + OLYMPIAD_START_COUNTDOWN_SECONDS * 1_000);
   await prisma.$transaction([
     prisma.olympiad.update({ where: { id }, data: { status: "RUNNING", startedAt, scheduledAt: null, endedAt: null } }),
     prisma.adminActivity.create({ data: adminActivity(session.user, {

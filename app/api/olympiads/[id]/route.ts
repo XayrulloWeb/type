@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { OLYMPIAD_START_COUNTDOWN_SECONDS } from "@/lib/olympiad-timing";
 import { calculateTypingStats, MINIMUM_RANKED_ACCURACY } from "@/lib/typing";
 
 type CompetitionPhase = "WAITING" | "COUNTDOWN" | "ATTEMPT_1" | "BREAK" | "ATTEMPT_2" | "FINISHED";
@@ -203,7 +204,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!olympiad.scheduledAt && eligibleCount > 0 && joinedCount >= eligibleCount) {
       await prisma.olympiad.updateMany({
         where: { id, status: "WAITING" },
-        data: { status: "RUNNING", startedAt: new Date(Date.now() + 5_000) },
+        data: { status: "RUNNING", startedAt: new Date(Date.now() + OLYMPIAD_START_COUNTDOWN_SECONDS * 1_000) },
       });
     }
     return NextResponse.json({ joined: true });

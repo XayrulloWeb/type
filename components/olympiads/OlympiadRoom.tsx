@@ -128,7 +128,7 @@ export function OlympiadRoom({ olympiadId, currentUserId }: { olympiadId: string
   }, [attemptStart, competitionText, officialNow, submit, submitted, timeLeft, typed]);
 
   if (!room) return <div className="data-card mx-auto mt-20 max-w-xl p-12 text-center text-nova-muted">Подключаемся к олимпиаде…</div>;
-  if (room.status === "WAITING") return <WaitingRoom room={room} />;
+  if (room.status === "WAITING") return <WaitingRoom room={room} officialNow={officialNow} />;
   if (room.status === "RUNNING" && !room.joined) return <Message title="Олимпиада уже началась" text="Войти после старта нельзя. Обратитесь к администратору." />;
   if (room.phase === "COUNTDOWN") return <Countdown value={countdown} title="Первая попытка начнётся через" text="Положите руки на клавиатуру. Текст откроется одновременно для всех." />;
   if (room.phase === "BREAK") return <Countdown value={countdown} title="Перерыв перед второй попыткой" text="Новый текст откроется автоматически. Лучший из двух результатов попадёт в рейтинг." />;
@@ -151,7 +151,50 @@ export function OlympiadRoom({ olympiadId, currentUserId }: { olympiadId: string
 }
 
 function Countdown({ value, title, text }: { value: number; title: string; text: string }) { return <div className="mx-auto mt-20 max-w-2xl px-5 text-center"><div className="text-sm uppercase tracking-[0.22em] text-nova-muted">{title}</div><div className="mt-6 text-[9rem] font-semibold leading-none text-nova-accent">{value}</div><p className="mt-7 text-sm text-nova-muted">{text}</p></div>; }
-function WaitingRoom({ room }: { room: RoomState }) { return <div className="mx-auto mt-14 max-w-2xl px-5 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-nova-accent/25 bg-nova-accent/8 text-nova-accent"><Clock3 size={28} /></div><p className="mt-7 text-xs uppercase tracking-[0.2em] text-nova-accent">Зал ожидания</p><h1 className="mt-2 text-3xl font-semibold">{room.title}</h1>{room.description && <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-nova-muted">{room.description}</p>}<div className="mx-auto mt-5 w-fit rounded-full border border-nova-accent/20 bg-nova-accent/5 px-4 py-2 text-xs text-nova-accent">2 попытки по {room.durationSeconds} сек. · перерыв {room.breakSeconds} сек. · лучший результат</div>{room.scheduledAt && <div className="mx-auto mt-3 w-fit rounded-full border border-nova-accent/20 bg-nova-accent/5 px-4 py-2 text-xs text-nova-accent">Старт: {new Date(room.scheduledAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>}<div className="data-card mt-8 p-7"><Users className="mx-auto text-nova-muted" size={22} /><div className="mt-3 text-4xl font-semibold">{room.joinedCount} / {room.eligibleCount}</div><div className="mt-2 text-xs text-nova-muted">участников вошли · {room.classes.join(", ")}</div><div className="mt-6 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-nova-accent transition-all" style={{ width: `${room.eligibleCount ? Math.min(100, room.joinedCount / room.eligibleCount * 100) : 0}%` }} /></div></div><p className="mt-6 text-sm text-nova-muted">Не закрывайте страницу. Олимпиада начнётся одновременно для всех автоматически или по команде администратора.</p></div>; }
+
+function WaitingRoom({ room, officialNow }: { room: RoomState; officialNow: number }) {
+  const scheduledTime = room.scheduledAt ? new Date(room.scheduledAt).getTime() : null;
+  const remainingSeconds = scheduledTime && officialNow > 0
+    ? Math.max(0, Math.ceil((scheduledTime - officialNow) / 1_000))
+    : null;
+  const days = remainingSeconds === null ? 0 : Math.floor(remainingSeconds / 86_400);
+  const hours = remainingSeconds === null ? 0 : Math.floor((remainingSeconds % 86_400) / 3_600);
+  const minutes = remainingSeconds === null ? 0 : Math.floor((remainingSeconds % 3_600) / 60);
+  const seconds = remainingSeconds === null ? 0 : remainingSeconds % 60;
+  const timeParts = [
+    ...(days > 0 ? [{ value: days, label: "дней" }] : []),
+    { value: hours, label: "часов" },
+    { value: minutes, label: "минут" },
+    { value: seconds, label: "секунд" },
+  ];
+
+  return <div className="mx-auto mt-10 max-w-3xl px-5 pb-12 text-center">
+    <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-nova-accent/25 bg-nova-accent/8 text-nova-accent"><Clock3 size={28} /></div>
+    <p className="mt-7 text-xs uppercase tracking-[0.2em] text-nova-accent">Зал ожидания</p>
+    <h1 className="mt-2 text-3xl font-semibold">{room.title}</h1>
+    {room.description && <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-nova-muted">{room.description}</p>}
+    <div className="mx-auto mt-5 w-fit rounded-full border border-nova-accent/20 bg-nova-accent/5 px-4 py-2 text-xs text-nova-accent">2 попытки по {room.durationSeconds} сек. · перерыв {room.breakSeconds} сек. · лучший результат</div>
+
+    {room.scheduledAt ? <div className="data-card relative mt-7 overflow-hidden p-6 sm:p-8">
+      <div className="pointer-events-none absolute inset-x-16 top-0 h-px bg-gradient-to-r from-transparent via-nova-accent to-transparent" />
+      <div className="text-[10px] uppercase tracking-[0.24em] text-nova-muted">До начала олимпиады</div>
+      <div className={`mx-auto mt-5 grid max-w-xl gap-2 ${days > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
+        {timeParts.map((part) => <div className="rounded-xl border border-white/8 bg-black/15 px-2 py-4" key={part.label}>
+          <div className="font-mono text-3xl font-semibold tabular-nums text-nova-accent sm:text-5xl">{String(part.value).padStart(2, "0")}</div>
+          <div className="mt-2 text-[9px] uppercase tracking-wider text-nova-muted">{part.label}</div>
+        </div>)}
+      </div>
+      <div className="mt-5 text-xs text-nova-muted">Старт: {new Date(room.scheduledAt).toLocaleString("ru-RU", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>
+    </div> : <div className="data-card mt-7 p-6">
+      <div className="text-[10px] uppercase tracking-[0.24em] text-nova-muted">Ожидаем команду администратора</div>
+      <div className="mt-3 text-xl font-semibold text-nova-text">Старт ещё не дан</div>
+      <p className="mt-2 text-xs text-nova-muted">После запуска здесь появится общий обратный отсчёт.</p>
+    </div>}
+
+    <div className="data-card mt-4 p-7"><Users className="mx-auto text-nova-muted" size={22} /><div className="mt-3 text-4xl font-semibold">{room.joinedCount} / {room.eligibleCount}</div><div className="mt-2 text-xs text-nova-muted">участников вошли · {room.classes.join(", ")}</div><div className="mt-6 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-nova-accent transition-all" style={{ width: `${room.eligibleCount ? Math.min(100, room.joinedCount / room.eligibleCount * 100) : 0}%` }} /></div></div>
+    <p className="mt-6 text-sm text-nova-muted">Не закрывайте страницу. После нуля первая попытка начнётся одновременно у всех, и только тогда пойдёт её время.</p>
+  </div>;
+}
 
 function Results({ room, currentUserId }: { room: RoomState; currentUserId: string }) {
   const standings = [...room.participants].filter((item) => item.hasResult && (item.accuracy ?? 0) >= MINIMUM_RANKED_ACCURACY && !item.disqualified).sort((a, b) => (b.wpm ?? 0) - (a.wpm ?? 0) || (b.accuracy ?? 0) - (a.accuracy ?? 0) || a.errors - b.errors);
