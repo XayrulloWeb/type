@@ -14,6 +14,7 @@ export function ShopItemAction({ className = "", itemId, kind, price }: { classN
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const scrollPosition = captureShopPosition(itemId);
     setMessage(null);
     startTransition(async () => {
       const result = kind === "purchase"
@@ -22,7 +23,10 @@ export function ShopItemAction({ className = "", itemId, kind, price }: { classN
       const feedback = actionFeedback(result);
       setMessage(feedback.message);
       setIsError(feedback.error);
-      if (!feedback.error) router.refresh();
+      if (!feedback.error) {
+        router.refresh();
+        restoreShopPosition(scrollPosition);
+      }
     });
   }
 
@@ -45,6 +49,8 @@ export function ShopMediaUpload({ customUrl, kind }: { customUrl?: string | null
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    const itemId = kind === "music" ? "music-custom" : "avatar-custom";
+    const scrollPosition = captureShopPosition(itemId);
     setPending(true);
     setMessage(null);
     try {
@@ -63,6 +69,7 @@ export function ShopMediaUpload({ customUrl, kind }: { customUrl?: string | null
       setMessage("Файл загружен и сразу используется");
       form.reset();
       router.refresh();
+      restoreShopPosition(scrollPosition);
     } catch {
       setIsError(true);
       setMessage("Не удалось загрузить файл. Попробуйте ещё раз.");
@@ -95,4 +102,26 @@ function uploadError(error?: string) {
   if (error === "not-owned") return "Сначала купите персональный слот";
   if (error === "login") return "Войдите в аккаунт снова";
   return "Не удалось загрузить файл. Попробуйте ещё раз.";
+}
+
+type ShopScrollPosition = { itemId: string; itemOffset: number | null; pageY: number };
+
+function captureShopPosition(itemId: string): ShopScrollPosition {
+  const item = document.getElementById(`shop-item-${itemId}`);
+  return { itemId, itemOffset: item?.getBoundingClientRect().top ?? null, pageY: window.scrollY };
+}
+
+function restoreShopPosition(position: ShopScrollPosition) {
+  const restore = () => {
+    const item = document.getElementById(`shop-item-${position.itemId}`);
+    if (item && position.itemOffset !== null) {
+      window.scrollBy({ top: item.getBoundingClientRect().top - position.itemOffset, behavior: "auto" });
+      return;
+    }
+    window.scrollTo({ top: position.pageY, behavior: "auto" });
+  };
+  requestAnimationFrame(restore);
+  window.setTimeout(restore, 120);
+  window.setTimeout(restore, 450);
+  window.setTimeout(restore, 900);
 }

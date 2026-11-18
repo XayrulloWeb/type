@@ -115,8 +115,12 @@ export function defenseRewards({ accuracy, bossesDestroyed, destroyed, duration,
   if (maxCombo >= 20) medals.push("Мастер комбо");
 
   const qualifiesForCredits = duration >= 45 && destroyed >= 10 && accuracy >= 80;
-  const difficultyBonus = difficulty === "hard" ? 2 : difficulty === "medium" ? 1 : 0;
-  const credits = qualifiesForCredits ? 1 + (stars - 1) + difficultyBonus + Math.min(2, bossesDestroyed) : 0;
+  const baseCredits = difficulty === "hard" ? 26 : difficulty === "medium" ? 18 : 12;
+  const starBonus = (stars - 1) * 4;
+  const accuracyBonus = accuracy >= 95 ? 4 : accuracy >= 90 ? 2 : 0;
+  const enduranceBonus = duration >= 120 ? 6 : duration >= 90 ? 3 : 0;
+  const bossBonus = Math.min(3, bossesDestroyed) * 3;
+  const credits = qualifiesForCredits ? baseCredits + starBonus + accuracyBonus + enduranceBonus + bossBonus : 0;
   return { credits, medals, stars };
 }
 
@@ -129,8 +133,8 @@ export function defenseBoxReward({ accuracy, destroyed, difficulty, duration, st
   if (normalizedRoll >= chance) return { box: null, credits: 0 };
 
   const rarityRoll = normalizedRoll / chance;
-  if (wpm >= 55 && accuracy >= 96 && difficulty === "hard" && rarityRoll < 0.025) return { box: "legendary", credits: 80 };
-  if (wpm >= 40 && accuracy >= 93 && rarityRoll < 0.13) return { box: "epic", credits: 30 };
-  if (rarityRoll < 0.42) return { box: "rare", credits: 12 };
-  return { box: "common", credits: 5 };
+  if (wpm >= 55 && accuracy >= 96 && difficulty === "hard" && rarityRoll < 0.025) return { box: "legendary", credits: 300 };
+  if (wpm >= 40 && accuracy >= 93 && rarityRoll < 0.13) return { box: "epic", credits: 120 };
+  if (rarityRoll < 0.42) return { box: "rare", credits: 45 };
+  return { box: "common", credits: 20 };
 }
