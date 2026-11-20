@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BarChart3, CalendarClock, ChevronLeft, ChevronRight, CircleUserRound, Medal, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarClock, ChevronLeft, ChevronRight, CircleUserRound, Coins, Medal, ShieldCheck } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getStudentRankings, normalizeDifficulty, type DifficultyFilter, type LanguageFilter, type StudentRanking } from "@/lib/leaderboard";
+import { getStudentDefenseCreditBalances } from "@/lib/defense-progress";
 import { requireSuperAdminPage } from "@/lib/admin";
 import { ResultModerationControls } from "@/components/admin/ResultModerationControls";
 
@@ -41,6 +42,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     schoolAll,
     schoolRu,
     schoolEn,
+    creditBalances,
   ] = await Promise.all([
     prisma.testResult.count({ where: testsWhere }),
     prisma.testResult.aggregate({ where: rankedWhere, _avg: { wpm: true, accuracy: true }, _max: { wpm: true }, _count: { _all: true } }),
@@ -49,6 +51,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     getStudentRankings("all", undefined, "all", difficulty),
     getStudentRankings("all", undefined, "ru", difficulty),
     getStudentRankings("all", undefined, "en", difficulty),
+    getStudentDefenseCreditBalances([id]),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(attemptsCount / ATTEMPTS_PER_PAGE));
@@ -89,6 +92,7 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
     : null;
   const shownFrom = attemptsCount ? (attemptsPage - 1) * ATTEMPTS_PER_PAGE + 1 : 0;
   const shownTo = Math.min(attemptsPage * ATTEMPTS_PER_PAGE, attemptsCount);
+  const credits = creditBalances.get(id) ?? 0;
 
   return <div>
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -121,12 +125,13 @@ export default async function StudentDetailsPage({ params, searchParams }: Stude
       {(["easy", "medium", "hard"] as DifficultyFilter[]).map((item) => <Link key={item} href={`?difficulty=${item}`} className={item === difficulty ? "test-option test-option-active" : "test-option"}>{difficultyLabel(item)}</Link>)}
     </div>
 
-    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
       <TopStat value={stats.all.tests} label="Тестов в рейтинге" icon={<ShieldCheck size={15} />} />
       <TopStat value={student.initialWpm ?? "—"} label="Первоначальная WPM" icon={<CalendarClock size={15} />} />
       <TopStat value={stats.all.averageWpm || "—"} label="Средняя WPM" icon={<BarChart3 size={15} />} />
       <TopStat value={stats.all.bestWpm || "—"} label="Лучшая WPM" accent icon={<Medal size={15} />} />
       <TopStat value={progress === null ? "—" : `${progress > 0 ? "+" : ""}${progress}`} label="Рост от первоначальной WPM" accent={progress !== null && progress > 0} icon={<BarChart3 size={15} />} />
+      <TopStat value={credits.toLocaleString("ru-RU")} label="NOVA Credits" accent icon={<Coins size={15} />} />
     </div>
 
     <section className="mt-8">

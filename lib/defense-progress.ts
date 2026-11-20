@@ -30,6 +30,31 @@ export interface DefenseAchievement {
   unlocked: boolean;
 }
 
+export async function getStudentDefenseCreditBalances(userIds: string[]) {
+  const uniqueUserIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueUserIds.length === 0) return new Map<string, number>();
+
+  const [earnedRows, spentRows] = await Promise.all([
+    prisma.gameResult.groupBy({
+      by: ["userId"],
+      where: { userId: { in: uniqueUserIds }, game: "defense", isRanked: true },
+      _sum: { rewardCredits: true },
+    }),
+    prisma.gamePurchase.groupBy({
+      by: ["userId"],
+      where: { userId: { in: uniqueUserIds } },
+      _sum: { price: true },
+    }),
+  ]);
+
+  const earnedByUser = new Map(earnedRows.map((row) => [row.userId, row._sum.rewardCredits ?? 0]));
+  const spentByUser = new Map(spentRows.map((row) => [row.userId, row._sum.price ?? 0]));
+  return new Map(uniqueUserIds.map((userId) => [
+    userId,
+    Math.max(0, (earnedByUser.get(userId) ?? 0) - (spentByUser.get(userId) ?? 0)),
+  ]));
+}
+
 export async function getDefensePlayerProgress(userId: string, includePrivateMissions = false) {
   const where = {
     game: "defense",

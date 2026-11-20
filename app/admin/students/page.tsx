@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { StudentManager } from "@/components/admin/StudentManager";
 import { requireSuperAdminPage } from "@/lib/admin";
+import { getStudentDefenseCreditBalances } from "@/lib/defense-progress";
 
 export default async function StudentsPage() {
   await requireSuperAdminPage();
@@ -12,6 +13,7 @@ export default async function StudentsPage() {
       orderBy: [{ class: { name: "asc" } }, { firstName: "asc" }],
     }),
   ]);
+  const creditBalances = await getStudentDefenseCreditBalances(students.map((student) => student.id));
 
   return <StudentManager
     classes={classes.map((item) => ({ id: item.id, name: item.name }))}
@@ -26,6 +28,7 @@ export default async function StudentsPage() {
       archivedAt: item.archivedAt?.toISOString() ?? null,
       passwordAvailable: Boolean(item.passwordEncrypted),
       tests: item._count.testResults,
+      credits: creditBalances.get(item.id) ?? 0,
       createdAt: item.createdAt.toISOString(),
     }))}
   />;
