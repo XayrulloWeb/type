@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Header } from "@/components/Header";
 import { getDefenseRankings } from "@/lib/defense-leaderboard";
-import { getDefensePlayerProgress, type DefenseAchievement } from "@/lib/defense-progress";
+import { getDefensePlayerProgress, getStudentDefenseCreditBalances, type DefenseAchievement } from "@/lib/defense-progress";
 import type { DefenseDifficulty, DefenseLanguage } from "@/lib/defense-shared";
 
 type RankingView = "students" | "classes";
@@ -30,6 +30,9 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
     prisma.gameResult.count({ where: { game: "defense", user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
     prisma.gameResult.groupBy({ by: ["userId"], where: { game: "defense", user: { role: "STUDENT", isActive: true, archivedAt: null } } }),
   ]);
+  const creditBalances = isAdmin
+    ? await getStudentDefenseCreditBalances([...rankings.students, ...rankings.pendingStudents].map((item) => item.userId))
+    : new Map<string, number>();
 
   return <div className="min-h-screen"><Header user={session.user} /><main className="page-shell !max-w-[86rem]">
     <section className="relative overflow-hidden rounded-[2rem] border border-nova-accent/15 bg-[#101416] shadow-[0_35px_100px_rgba(0,0,0,0.42)]">
@@ -70,7 +73,7 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
           {view === "students" && <p className="mt-3 max-w-3xl text-xs leading-5 text-nova-muted">Место получают миссии от 12 секунд, минимум с 5 уничтоженными целями и точностью от 70%. Ученики, которые уже играли, но ещё не выполнили условия, показаны ниже со статусом «ожидание».</p>}
         </div>
 
-        {view === "students" ? <StudentRanking rankings={rankings.students} pendingRankings={rankings.pendingStudents} /> : <ClassRanking rankings={rankings.classes} />}
+        {view === "students" ? <StudentRanking rankings={rankings.students} pendingRankings={rankings.pendingStudents} creditBalances={creditBalances} showCredits={isAdmin} /> : <ClassRanking rankings={rankings.classes} />}
       </div>
 
       <aside className="space-y-4">
@@ -92,8 +95,8 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   </main></div>;
 }
 
-function StudentRanking({ rankings, pendingRankings }: { rankings: Awaited<ReturnType<typeof getDefenseRankings>>["students"]; pendingRankings: Awaited<ReturnType<typeof getDefenseRankings>>["pendingStudents"] }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="text-[10px] uppercase tracking-[0.12em] text-nova-muted"><tr><th className="p-4 text-center">Место</th><th className="p-4">Ученик</th><th className="p-4">Класс</th><th className="p-4 text-right">Очки</th><th className="p-4 text-right">Боссы</th><th className="p-4 text-right">WPM</th><th className="p-4 text-right">Точность</th></tr></thead><tbody className="divide-y divide-white/5">{rankings.map((item, index) => <tr key={item.id}><td className="p-4 text-center"><Place value={index + 1} /></td><td className="p-4 font-medium">{item.user.firstName} {item.user.lastName}</td><td className="p-4 text-nova-muted">{item.user.class?.name ?? "—"}</td><td className="p-4 text-right font-semibold text-nova-accent">{item.score.toLocaleString("ru-RU")}</td><td className="p-4 text-right text-red-200">{item.bossesDestroyed}</td><td className="p-4 text-right">{item.wpm}</td><td className="p-4 text-right text-nova-muted">{item.accuracy.toFixed(0)}%</td></tr>)}{pendingRankings.map((item) => <tr key={item.id} className="bg-white/[0.01] opacity-60"><td className="p-4 text-center"><span className="text-[10px] font-semibold uppercase tracking-wide text-nova-muted">ожидание</span></td><td className="p-4"><div className="font-medium">{item.user.firstName} {item.user.lastName}</div><div className="mt-1 text-[9px] text-nova-muted">пока не выполнены условия рейтинга</div></td><td className="p-4 text-nova-muted">{item.user.class?.name ?? "—"}</td><td className="p-4 text-right font-semibold text-white/55">{item.score.toLocaleString("ru-RU")}</td><td className="p-4 text-right text-red-200/65">{item.bossesDestroyed}</td><td className="p-4 text-right text-white/55">{item.wpm}</td><td className="p-4 text-right text-nova-muted">{item.accuracy.toFixed(0)}%</td></tr>)}{rankings.length === 0 && pendingRankings.length === 0 && <tr><td colSpan={7} className="p-14 text-center text-nova-muted">В этом режиме пока никто не играл.</td></tr>}</tbody></table></div>;
+function StudentRanking({ rankings, pendingRankings, creditBalances, showCredits }: { rankings: Awaited<ReturnType<typeof getDefenseRankings>>["students"]; pendingRankings: Awaited<ReturnType<typeof getDefenseRankings>>["pendingStudents"]; creditBalances: Map<string, number>; showCredits: boolean }) {
+  return <div className="overflow-x-auto"><table className={`w-full text-left text-sm ${showCredits ? "min-w-[780px]" : "min-w-[680px]"}`}><thead className="text-[10px] uppercase tracking-[0.12em] text-nova-muted"><tr><th className="p-4 text-center">Место</th><th className="p-4">Ученик</th><th className="p-4">Класс</th><th className="p-4 text-right">Очки</th>{showCredits && <th className="p-4 text-right" title="Текущий баланс ученика во всех режимах">Кредиты</th>}<th className="p-4 text-right">Боссы</th><th className="p-4 text-right">WPM</th><th className="p-4 text-right">Точность</th></tr></thead><tbody className="divide-y divide-white/5">{rankings.map((item, index) => <tr key={item.id}><td className="p-4 text-center"><Place value={index + 1} /></td><td className="p-4 font-medium">{item.user.firstName} {item.user.lastName}</td><td className="p-4 text-nova-muted">{item.user.class?.name ?? "—"}</td><td className="p-4 text-right font-semibold text-nova-accent">{item.score.toLocaleString("ru-RU")}</td>{showCredits && <td className="p-4 text-right"><span className="inline-flex items-center justify-end gap-1.5 font-semibold tabular-nums text-nova-accent"><Coins size={13} />{(creditBalances.get(item.userId) ?? 0).toLocaleString("ru-RU")}</span></td>}<td className="p-4 text-right text-red-200">{item.bossesDestroyed}</td><td className="p-4 text-right">{item.wpm}</td><td className="p-4 text-right text-nova-muted">{item.accuracy.toFixed(0)}%</td></tr>)}{pendingRankings.map((item) => <tr key={item.id} className="bg-white/[0.01] opacity-60"><td className="p-4 text-center"><span className="text-[10px] font-semibold uppercase tracking-wide text-nova-muted">ожидание</span></td><td className="p-4"><div className="font-medium">{item.user.firstName} {item.user.lastName}</div><div className="mt-1 text-[9px] text-nova-muted">пока не выполнены условия рейтинга</div></td><td className="p-4 text-nova-muted">{item.user.class?.name ?? "—"}</td><td className="p-4 text-right font-semibold text-white/55">{item.score.toLocaleString("ru-RU")}</td>{showCredits && <td className="p-4 text-right font-semibold tabular-nums text-nova-accent/70">{(creditBalances.get(item.userId) ?? 0).toLocaleString("ru-RU")}</td>}<td className="p-4 text-right text-red-200/65">{item.bossesDestroyed}</td><td className="p-4 text-right text-white/55">{item.wpm}</td><td className="p-4 text-right text-nova-muted">{item.accuracy.toFixed(0)}%</td></tr>)}{rankings.length === 0 && pendingRankings.length === 0 && <tr><td colSpan={showCredits ? 8 : 7} className="p-14 text-center text-nova-muted">В этом режиме пока никто не играл.</td></tr>}</tbody></table></div>;
 }
 
 function ClassRanking({ rankings }: { rankings: Awaited<ReturnType<typeof getDefenseRankings>>["classes"] }) {
